@@ -1,4 +1,3 @@
-
 #
 # This is a schematron implemenation in python
 #
@@ -13,8 +12,10 @@ import os
 from .xsl_generator import schema_to_xsl
 from elementpath import XPath2Parser, XPathContext, select
 
+
 class SchematronException(Exception):
     pass
+
 
 def abstract_replace_vars(text, variables):
     s = text
@@ -23,6 +24,7 @@ def abstract_replace_vars(text, variables):
     for key in keys:
         s = s.replace("$%s" % key, variables[key])
     return s
+
 
 class WorkingDirectory(object):
     def __init__(self, new_directory):
@@ -35,20 +37,26 @@ class WorkingDirectory(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         os.chdir(self.original_directory)
 
+
 class Schema(object):
-    def __init__(self):
+    def __init__(self, verbosity=0):
         self.title = None
         self.file_path = None
+        self.verbosity = verbosity
 
         # Prefixes is a mapping of prefix to uri
         self.ns_prefixes = {}
         # A list of patterns
         self.patterns = []
 
+    def msg(self, level, msg):
+        if self.verbosity >= level:
+            print(msg)
+
     def read_from_file(self, file_path):
         self.file_path = file_path
         xml = etree.parse(file_path)
-        #print("[XX] processing %s" % file_path)
+        # print("[XX] processing %s" % file_path)
         with WorkingDirectory(os.path.dirname(file_path)):
             root = xml.getroot()
             for element in root:
@@ -81,10 +89,10 @@ class Schema(object):
     def process_abstract_patterns(self):
         for pattern in self.patterns:
             if pattern.isa is not None:
-                #print("applying %s to %s" % (pattern.isa, pattern.id))
-                #print("rule count: %d" % len(pattern.rules))
+                # print("applying %s to %s" % (pattern.isa, pattern.id))
+                # print("rule count: %d" % len(pattern.rules))
                 abstract = self.find_pattern(pattern.isa)
-                #for pk,pv in pattern.variables.items():
+                # for pk,pv in pattern.variables.items():
                 # Do Note: abstract is the pattern defining the rules; the isa origin defines the parameters
                 for rule in abstract.rules:
                     rule.context = abstract_replace_vars(rule.context, pattern.variables)
@@ -106,56 +114,63 @@ class Schema(object):
 
             parser = XPath2Parser(self.ns_prefixes, p.variables)
 
-            # print("[XX] %s has %d rules" % (p.id, len(p.rules)))
-            for r in p.rules:
+            # Variables themselves can be expressions,
+            # so we evaluate them here, and replace the originals
+            # with the result of the evaluation
+            if p.variables and 's' in p.variables:
+                for name,value in parser.variables.items():
+                    root_node = parser.parse(value)
+                    context = XPathContext(root=xml_doc)
+                    result = root_node.evaluate(context)
+                    parser.variables[name] = result
 
-                # Is this a bug in elementpath or should we simply not select a context?
-                # See what elementpath does with context_item=None
+
+            for r in p.rules:
+                # Contexts are essentially a findall(), so if it is not absolute, make it a selector
+                # that finds them all
+                if not r.context.startswith('/'):
+                    r.context = "//" + r.context
+                # If the context is the literal '/', pass 'None' as the context item to elementpath
                 if r.context == '/':
                     elements = [None]
                 else:
-                    elements = select(xml_doc, r.context, namespaces=self.ns_prefixes, variables=p.variables)
+                    elements = select(xml_doc, r.context, namespaces=self.ns_prefixes, variables=parser.variables)
+
                 for element in elements:
                     # Important NOTE: the XPathContext can be modified by the evaluator!
                     # Not sure if this is intentional, but we need to make sure we re-initialize it
                     # for every assertion.
                     for a in r.assertions:
                         context = XPathContext(root=xml_doc, item=element)
-                        #print("[XX] START TEST: '%s'" % a.id)
-                        #print("[XX] TEST EXPR: '%s'" % a.test)
+                        self.msg(3, "Start test: %s" % a.id)
+                        self.msg(4, "Test context: %s" % str(r.context))
+                        self.msg(4, "Test expression: %s" % a.test)
                         root_token = parser.parse(a.test)
 
-                        #print("[XX] Pattern: %s" % p.id)
-                        #print("[XX] Context root: %s" % str(xml_doc.getroot()))
-                        #print("[XX] Context item: %s" % r.context)
-                        #print("[XX] CONTEXT ELEMENT: " + str(element))
-                        #if 'id' in a.__dict__:
-                        #    print("[XX] Id: " + a.id)
-                        #print("[XX] Test: '%s'" % a.test)
                         result = root_token.evaluate(context=context)
                         if not result:
-                            print("[XX] Failed assertion")
-                            print("[XX] Pattern: %s" % p.id)
-                            print("[XX] Variables:")
-                            for k,v in p.variables.items():
-                                print("  %s: %s" % (k,v))
-                            print("[XX] Context root: %s" % str(xml_doc.getroot()))
-                            print("[XX] Context item: %s" % r.context)
-                            print("[XX] CONTEXT ELEMENT: " + str(element))
+                            self.msg(5, "Failed assertion")
+                            self.msg(5, "Pattern: %s" % p.id)
+                            self.msg(5, "Variables:")
+                            for k, v in p.variables.items():
+                                self.msg(5, "  %s: %s" % (k, v))
+                            self.msg(5, "Context root: %s" % str(xml_doc.getroot()))
+                            self.msg(5, "Context item: %s" % r.context)
+                            self.msg(5, "CONTEXT ELEMENT: " + str(element))
                             if 'id' in a.__dict__:
-                                print("[XX] Id: " + a.id)
-                            print("[XX] Test: '%s'" % a.test)
-                            print("[XX] Result: %s" % str(result))
+                                self.msg(5, "Id: " + a.id)
+                            self.msg(5, "Test: '%s'" % a.test)
+                            self.msg(5, "Result: %s" % str(result))
 
                             if a.flag == "warning":
                                 warnings.append(a)
                             else:
-                                print("[XX] ELEMENTS: " + str(elements))
-                                #raise Exception(self.file_path)
+                                self.msg(5, "ELEMENTS: " + str(elements))
+                                # raise Exception(self.file_path)
                                 errors.append(a)
-                        # pass
 
         return (errors, warnings)
+
 
 class Pattern(object):
     def __init__(self):
@@ -192,10 +207,11 @@ class Pattern(object):
                 raise SchematronException("Unknown element in pattern: %s: %s" % (self.id, element.tag))
 
     def read_from_file(self, file_path):
-        #print("[XX] processing %s" % file_path)
+        # print("[XX] processing %s" % file_path)
         xml = etree.parse(file_path)
         with WorkingDirectory(os.path.dirname(file_path)):
             self.read_from_element(xml.getroot())
+
 
 class Rule(object):
     def __init__(self):
@@ -215,6 +231,7 @@ class Rule(object):
                 self.assertions.append(assertion)
             else:
                 raise SchematronException("Unknown element in rule with context %s: %s" % (self.context, element.tag))
+
 
 class Assertion(object):
     def __init__(self):

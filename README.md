@@ -29,6 +29,8 @@ This branch contains a number of workarounds for issues we encountered while tes
 
 This is an early beta, and it is not feature-complete yet, nor is the API frozen.
 
+Currently, validation works for a number of schematron files, and XSLT generation is partially complete.
+
 Plans for the near feature
 
 - feature compatibility with the skeleton transformators from schematron.com
