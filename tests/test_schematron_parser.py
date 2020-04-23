@@ -3,6 +3,7 @@ import unittest
 
 from elementpath import XPath2Parser, XPathContext, select
 from decimal import Decimal
+from lxml import etree
 
 from pyschematron.elements import Schema
 
@@ -119,6 +120,33 @@ class ParseSchematron(unittest.TestCase):
                         result = root_token.evaluate(context)
                         self.assertTrue(result, a.text)
 
+class TestValidation(unittest.TestCase):
+
+    def check_schema_validation(self, schema_file, xml_file, expected_errors, expected_warnings):
+        """
+        expected_errors is a list of the id values of the assertions that should fail with either no flag or flag="error"
+        expected_warnings is a list of the id values of the assertions that should fail with either flag="warning"
+        """
+        schema = Schema()
+        schema.read_from_file(schema_file)
+        schema.process_abstract_patterns()
+
+        xml_doc = etree.parse(xml_file)
+
+        errors, warnings = schema.validate_document(xml_doc)
+        error_id_list = [e.id for e in errors]
+        warning_id_list = [w.id for w in warnings]
+        self.assertEqual(expected_errors, error_id_list)
+        self.assertEqual(expected_warnings, warning_id_list)
+
+    def test_valid_documents(self):
+        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic_ok.xml"), [], [])
+
+    def test_invalid_documents(self):
+        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic_error_1.xml"), ["1"], [])
+        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic_error_2.xml"), ["2"], [])
+        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic_warning_3.xml"), [], ["3"])
+        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic_warning_4.xml"), [], ["4"])
 
 if __name__ == '__main__':
     unittest.main()

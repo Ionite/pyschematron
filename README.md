@@ -4,16 +4,15 @@ This is a library and toolset for [ISO Schematron](https://http://schematron.com
 
 It aims to be a feature-complete python implementation of the Schematron standard, with support for Xpath2.
 
-Right now it is in an early alpha stage, and is not nearly feature complete.
+Right now it is in an early alpha stage, and is not nearly feature complete. See the file specification_notes.md for more information on which parts of the specification have been implemented.
 
 This library includes two tools:
-
 
 ##### pyschematron-to-xslt.py
 
 This tool converts a schematron file to an XSLT file that can be used with any other program that can handle XSLT(2) files. The resulting XSLT transforms an xml document into an SVRL (Schematron Validation Result Language) report.
 
-##### pyschematron-validate.py
+##### pyschematron-validate-xml.py
 
 This tool takes a schematron file and an xml document, and directly validates the document against the schematron rules.
 
