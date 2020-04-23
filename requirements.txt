@@ -1,2 +1,2 @@
--e git+git@github.com:tjeb/elementpath.git@8e2859efd149503baa342d0a09012239360cd483#egg=elementpath
+elementpath==1.4.4
 lxml==4.5.0

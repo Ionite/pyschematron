@@ -6,8 +6,8 @@
 import argparse
 import sys
 
-from pyschematron import *
-from elementpath import ElementPathError, XPath2Parser, XPathContext, select, iter_select
+from lxml import etree
+from pyschematron.elements import Schema
 
 
 def main():

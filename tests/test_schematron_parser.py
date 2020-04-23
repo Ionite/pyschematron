@@ -1,14 +1,10 @@
 import os
-import re
 import unittest
 
-from pyschematron import *
-
-from elementpath import ElementPathError, XPath2Parser, XPathContext, select, iter_select
-from elementpath.namespaces import XML_NAMESPACE, XSD_NAMESPACE, \
-    XSI_NAMESPACE, XPATH_FUNCTIONS_NAMESPACE
+from elementpath import XPath2Parser, XPathContext, select
 from decimal import Decimal
 
+from pyschematron.elements import Schema
 
 BASE_DIR = os.path.abspath("%s/../../" % __file__)
 

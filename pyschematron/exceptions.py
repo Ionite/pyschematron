@@ -1,0 +1,2 @@
+class SchematronException(Exception):
+    pass
