@@ -103,7 +103,7 @@ class TestParseSchematron(unittest.TestCase):
     def test_basic_example(self):
         schema = Schema(get_file("schematron", "basic.sch"))
 
-        doc = etree.parse(get_file("xml", "basic_ok.xml"))
+        doc = etree.parse(get_file("xml", "basic1_ok.xml"))
 
         variables = {}
         parser = XPath2Parser(schema.ns_prefixes, variables)
@@ -131,7 +131,6 @@ class TestValidation(unittest.TestCase):
         expected_warnings is a list of the id values of the assertions that should fail with either flag="warning"
         """
         schema = Schema(schema_file)
-
         xml_doc = etree.parse(xml_file)
 
         errors, warnings = schema.validate_document(xml_doc)
@@ -141,18 +140,66 @@ class TestValidation(unittest.TestCase):
         self.assertEqual(expected_warnings, warning_id_list)
 
     def test_valid_documents(self):
-        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic_ok.xml"), [], [])
+        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic1_ok.xml"), [], [])
 
     def test_invalid_documents(self):
-        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic_error_1.xml"), ["1"], [])
-        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic_error_2.xml"), ["2"], [])
-        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic_warning_3.xml"), [], ["3"])
-        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic_warning_4.xml"), [], ["4"])
+        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic1_error_1.xml"), ["1"], [])
+        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic1_error_2.xml"), ["2"], [])
+        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic1_warning_3.xml"), [], ["3"])
+        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic1_warning_4.xml"), [], ["4"])
+
+class TestRuleOrder(unittest.TestCase):
+    """
+    This test is taken from the article at
+    http://schematron.com/2018/07/the-most-common-programming-error-with-schematron/
+    """
+    def setUp(self):
+        self.schema = Schema(get_file("schematron", "orderchecks/xslt.sch"))
+
+    def validate(self, schema, xml_string):
+        xml_doc = etree.ElementTree(etree.XML(xml_string))
+        errors, warnings = schema.validate_document(xml_doc)
+        error_ruleid_list = [ e.rule.id for e in errors ]
+        return error_ruleid_list
+
+    def check_rule_order(self, schematron_file):
+        schema = Schema(get_file("schematron", schematron_file))
+
+        # Element a should match rule 1 only
+        self.assertEqual([], self.validate(schema, '<a>1</a>'))
+        #self.assertEqual(['r1'], self.validate("<a>2</a>"))
+        self.assertEqual(['r1'], self.validate(schema, '<root id="1"><a>2</a></root>'))
+
+        # Element c should match rule 3 only
+        self.assertEqual([], self.validate(schema, "<c>1</c>"))
+        self.assertEqual(['r3'], self.validate(schema, "<c>2</c>"))
+
+        # Element c should match rule 4 only
+        self.assertEqual([], self.validate(schema, "<d>1</d>"))
+        self.assertEqual(['r4'], self.validate(schema, "<d>2</d>"))
+
+        # An arbitraty element should match rule 5
+        self.assertEqual([], self.validate(schema, '<arb id="a">1</arb>'))
+        self.assertEqual(['r5'], self.validate(schema, "<arb>1</arb>"))
+
+        # Make sure this goes for nested elements too
+        self.assertEqual([], self.validate(schema, '<arb id="a"><a>1</a><b>1</b><c>1</c><d>1</d><e id="1">1</e></arb>'))
+        self.assertEqual(['r4'], self.validate(schema, '<arb id="a"><a>1</a><b>1</b><c>1</c><d>2</d><e id="1">1</e></arb>'))
+        self.assertEqual(['r1', 'r2', 'r3', 'r4'], self.validate(schema, '<arb id="a"><a>2</a><b>2</b><c>2</c><d>2</d><e id="1">2</e></arb>'))
+
+    def test_order_xslt(self):
+        self.check_rule_order("orderchecks/xslt.sch")
+
+    def test_order_xslt2(self):
+        self.check_rule_order("orderchecks/xslt2.sch")
+
+    def test_order_xpath2(self):
+        self.check_rule_order("orderchecks/xpath2.sch")
 
 class TestXpath2QueryBinding(unittest.TestCase):
     def test_error_let_statement(self):
         schema = Schema(get_file("schematron", "xpath2/error_let_statement.sch"))
-        xml_doc = etree.parse(get_file("xml", "basic_ok.xml"))
+        xml_doc = etree.parse(get_file("xml", "basic1_ok.xml"))
         self.assertRaises(SchematronQueryBindingError, schema.validate_document, xml_doc)
 
 if __name__ == '__main__':

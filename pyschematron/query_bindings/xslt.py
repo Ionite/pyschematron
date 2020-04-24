@@ -1,8 +1,9 @@
 
 from pyschematron.exceptions import *
 
-from elementpath import XPath1Parser, XPathContext, select
+from elementpath import XPath1Parser, XPathContext, select, Selector
 
+from lxml import etree
 
 def instantiate():
     return XSLTBinding()
@@ -27,7 +28,30 @@ class XSLTBinding(object):
         :param variables: Variables to be used in the rule context expression
         :return:
         """
-        return select(xml_document, rule_context, namespaces=namespaces, variables=variables)
+        result = select(xml_document, rule_context, namespaces=namespaces, variables=variables, parser=XPath1Parser)
+        if rule_context.startswith('/'):
+            return result
+        else:
+            selector = Selector(rule_context, namespaces=namespaces, variables=variables)
+            for el in xml_document.iter():
+                result.extend(selector.select(el))
+            return result
+
+    def check_element_context(self, root_element, element, context, namespaces, variables):
+        print("[XX] checking element context")
+        print("[XX] element: %s" % etree.tostring(element).decode("utf-8"))
+        print("[XX] context to check: " + context)
+        #result = element.xpath(context, namespaces=namespaces, _variables=variables)
+        result = root_element.xpath(context)
+        print("[XX] result: " + str(result))
+        return result
+
+    def find_xpath_nodes(self, xml_document, element, context, namespaces, variables):
+        xp_r = element.xpath(context, namespaces=namespaces, **variables)
+        return xp_r
+
+    def find_all(self, xml_document, context, namespaces, variables):
+        return xml_document.findall(context, namespaces=namespaces, **variables)
 
     def parse_expression(self, xml_document, expression, namespaces, variables):
         parser = XPath1Parser(namespaces, variables)

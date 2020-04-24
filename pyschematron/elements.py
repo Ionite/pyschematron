@@ -60,7 +60,6 @@ class Schema(object):
         """
         self.file_path = file_path
         xml = etree.parse(file_path)
-        # print("[XX] processing %s" % file_path)
         with WorkingDirectory(os.path.dirname(file_path)):
             root = xml.getroot()
             # Process the attributes
@@ -110,6 +109,7 @@ class Schema(object):
                     for assertion in rule.assertions:
                         assertion.test = abstract_replace_vars(self.query_binding, assertion.test, pattern.params)
 
+
     def validate_document(self, xml_doc):
         """
         Validates the given xml document against this schematron schema.
@@ -118,7 +118,10 @@ class Schema(object):
         """
         errors = []
         warnings = []
+
         for p in self.patterns:
+            # We track the fired rule for each element, since every document node should only have one rule
+            fired_rules = {}
             # Variables themselves can be expressions,
             # so we evaluate them here, and replace the originals
             # with the result of the evaluation
@@ -130,8 +133,8 @@ class Schema(object):
                 # Contexts are essentially a findall(), so if it is not absolute, make it a selector
                 # that finds them all
                 # This may be query-binding-specific
-                if not r.context.startswith('/'):
-                    r.context = "//" + r.context
+                #if not r.context.startswith('/'):
+                #    r.context = "/" + r.context
                 # If the context is the literal '/', pass 'None' as the context item to elementpath
                 if r.context == '/':
                     elements = [None]
@@ -139,6 +142,10 @@ class Schema(object):
                     elements = self.query_binding.get_context_elements(xml_doc, r.context, namespaces=self.ns_prefixes, variables=p.variables)
 
                 for element in elements:
+                    if element in fired_rules:
+                        # Already matched a rule, skip this one
+                        continue
+                    fired_rules[element] = r.context
                     # Important NOTE: the XPathContext can be modified by the evaluator!
                     # Not sure if this is intentional, but we need to make sure we re-initialize it
                     # for every assertion.
@@ -167,7 +174,6 @@ class Schema(object):
                                 self.msg(5, "ELEMENTS: " + str(elements))
                                 # raise Exception(self.file_path)
                                 errors.append(a)
-
         return (errors, warnings)
 
 
@@ -184,7 +190,7 @@ class Pattern(object):
         self.rules = []
 
     def read_from_element(self, p_element):
-        self.id = p_element.attrib["id"]
+        self.id = p_element.attrib.get("id", "pattern")
         if "abstract" in p_element.attrib and p_element.attrib['abstract'] == 'true':
             self.abstract = True
         if "is-a" in p_element.attrib:
@@ -221,16 +227,18 @@ class Rule(object):
     def __init__(self):
         self.context = None
         self.assertions = []
+        self.id = None
 
     def read_from_element(self, r_element, variables):
         self.context = r_element.attrib['context']
+        self.id = r_element.attrib.get('id', "")
         for element in r_element:
             cls = element.__class__.__name__
             if cls == "_Comment":
                 continue
             el_name = etree.QName(element.tag).localname
             if el_name == 'assert':
-                assertion = Assertion()
+                assertion = Assertion(rule=self)
                 assertion.read_from_element(element, variables)
                 self.assertions.append(assertion)
             else:
@@ -238,11 +246,13 @@ class Rule(object):
 
 
 class Assertion(object):
-    def __init__(self):
+    def __init__(self, rule=None):
         self.id = "unset"
         self.test = None
         self.flag = None
         self.text = None
+
+        self.rule = rule
 
     def read_from_element(self, a_element, variables):
         self.test = a_element.attrib['test']
