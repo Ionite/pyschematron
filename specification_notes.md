@@ -103,7 +103,7 @@ Not implemented:
 - role
 - subject
 - abstract rules
-- rule validation
+- rule validation (i.e. whether the rule specification itself is valid)
 
 ##### 5.4.13 schema element
 
@@ -117,13 +117,15 @@ Implemented:
 - title
 
 Not implemented:
-- full handling of querybindings as specified in the annexes
 - schemaVersion check
 - defaultPhase
 - p
 - icon
 - see
 - fpi
+
+Need to verify:
+- full handling of querybindings as specified in the annexes
 
 ##### 5.4.14 value-of element
 
@@ -150,8 +152,8 @@ Implemented but needs verification of the specification.
 
 ##### 6.4 Query language binding
 
-Only implemented for XSLT2.
+Implemented for xslt, xpath2 and xslt2.
 
 ##### 6.5 Order and side-effects
 
-Not fully implemented; all rules are currently checked, instead of the if-then-else structure specified.
+Main rule order (match first, skip rest) has been implemented

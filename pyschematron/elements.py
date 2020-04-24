@@ -119,6 +119,14 @@ class Schema(object):
         errors = []
         warnings = []
 
+        # Idea for performance improvement:
+        # - loop over the actual elements in the document
+        # - while this element is not 'known', process rules as already done,
+        #   but store a mapping of each element that is encountered in a rule context match to that rule
+        # - process assertions when the element is encountered, but stop the rule loop, and move on to the next element
+        # - if this element is already 'known', we can immediately process the assertions
+        # - if not, continue the processing of rules
+
         for p in self.patterns:
             # We track the fired rule for each element, since every document node should only have one rule
             fired_rules = {}
