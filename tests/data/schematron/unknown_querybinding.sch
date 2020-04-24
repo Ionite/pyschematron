@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schema
+    xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2"
+    xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+    xmlns:ubl="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+    xmlns:cn="urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2"
     xmlns="http://purl.oclc.org/dsdl/schematron"
-    queryBinding="xslt2">
+    queryBinding="some-unknown-binding">
     <title>Basic schematron</title>
 
     <pattern xmlns="http://purl.oclc.org/dsdl/schematron" id="basic">

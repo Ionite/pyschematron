@@ -6,6 +6,7 @@ from decimal import Decimal
 from lxml import etree
 
 from pyschematron.elements import Schema
+from pyschematron.exceptions import *
 
 BASE_DIR = os.path.abspath("%s/../../" % __file__)
 
@@ -97,12 +98,10 @@ class TestIndividualStatements(unittest.TestCase):
 
 
 
-class ParseSchematron(unittest.TestCase):
+class TestParseSchematron(unittest.TestCase):
 
     def test_basic_example(self):
-        schema = Schema()
-        schema.read_from_file(get_file("schematron", "basic.sch"))
-        schema.process_abstract_patterns()
+        schema = Schema(get_file("schematron", "basic.sch"))
 
         doc = etree.parse(get_file("xml", "basic_ok.xml"))
 
@@ -120,6 +119,10 @@ class ParseSchematron(unittest.TestCase):
                         result = root_token.evaluate(context)
                         self.assertTrue(result, a.text)
 
+    def test_unknown_querybinding(self):
+        self.assertRaises(SchematronNotSupportedError, Schema, get_file("schematron", "unknown_querybinding.sch"))
+
+
 class TestValidation(unittest.TestCase):
 
     def check_schema_validation(self, schema_file, xml_file, expected_errors, expected_warnings):
@@ -127,9 +130,7 @@ class TestValidation(unittest.TestCase):
         expected_errors is a list of the id values of the assertions that should fail with either no flag or flag="error"
         expected_warnings is a list of the id values of the assertions that should fail with either flag="warning"
         """
-        schema = Schema()
-        schema.read_from_file(schema_file)
-        schema.process_abstract_patterns()
+        schema = Schema(schema_file)
 
         xml_doc = etree.parse(xml_file)
 

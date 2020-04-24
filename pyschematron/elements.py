@@ -4,34 +4,65 @@ This module contains the schematron elements, as defined in the schematron defin
 """
 import os
 
-from elementpath import XPath2Parser, XPathContext, select
+from elementpath import XPath2Parser, XPathContext
 from lxml import etree
 
-from pyschematron.exceptions import SchematronException
+from pyschematron.exceptions import *
 from pyschematron.util import WorkingDirectory, abstract_replace_vars
+from pyschematron.query_bindings import xslt2
 
+QUERY_BINDINGS = {
+    'xslt2': xslt2
+}
 
 class Schema(object):
-    def __init__(self, verbosity=0):
+    def __init__(self, filename=None, verbosity=0):
+        """
+        Initialize a Schematron Schema object
+
+        :param filename: If specified, parse the schematron definition in the given file
+        :param verbosity: The verbosity level
+        """
         self.title = None
         self.file_path = None
         self.verbosity = verbosity
+        self.query_binding = None
 
         # Prefixes is a mapping of prefix to uri
         self.ns_prefixes = {}
         # A list of patterns
         self.patterns = []
 
+        if filename is not None:
+            self.read_from_file(filename)
+
     def msg(self, level, msg):
         if self.verbosity >= level:
             print(msg)
 
-    def read_from_file(self, file_path):
+    def read_from_file(self, file_path, process_abstract_patterns=True):
+        """
+        Fully parses the given schematron file.
+
+        :param file_path: The .sch file to parse
+        :param process_abstract_patterns: Set to False to *not* automatically process the abstract patterns that are used
+        :return: None
+        """
         self.file_path = file_path
         xml = etree.parse(file_path)
         # print("[XX] processing %s" % file_path)
         with WorkingDirectory(os.path.dirname(file_path)):
             root = xml.getroot()
+            # Process the attributes
+            query_binding = root.attrib.get('queryBinding')
+            if query_binding is None:
+                self.query_binding = QUERY_BINDINGS['xslt']
+            elif query_binding not in QUERY_BINDINGS:
+                raise SchematronNotSupportedError("Query Binding '%s' is not supported by this implementation" % self.query_binding)
+            else:
+                self.query_binding = QUERY_BINDINGS[query_binding]
+
+            # Process the elements
             for element in root:
                 # Ignore comments
                 cls = element.__class__.__name__
@@ -51,13 +82,16 @@ class Schema(object):
                     pattern.read_from_file(element.attrib['href'])
                     self.patterns.append(pattern)
                 else:
-                    raise SchematronException("Unknown element in schematron file: %s" % element.tag)
+                    raise SchematronError("Unknown element in schematron file: %s" % element.tag)
+
+        if process_abstract_patterns:
+            self.process_abstract_patterns()
 
     def find_pattern(self, id):
         for pattern in self.patterns:
             if pattern.id == id:
                 return pattern
-        raise SchematronException("Can't find pattern %s" % id)
+        raise SchematronError("Can't find pattern %s" % id)
 
     def process_abstract_patterns(self):
         for pattern in self.patterns:
@@ -89,22 +123,23 @@ class Schema(object):
             # with the result of the evaluation
             if p.variables and 's' in p.variables:
                 for name,value in parser.variables.items():
-                    root_node = parser.parse(value)
-                    context = XPathContext(root=xml_doc)
-                    result = root_node.evaluate(context)
+                    result = self.query_binding.parse_expression(xml_doc, value, self.ns_prefixes, p.variables)
+                    p.variables[name] = result
+                    # Remove this one when parsing is fully done by querybinding
                     parser.variables[name] = result
 
 
             for r in p.rules:
                 # Contexts are essentially a findall(), so if it is not absolute, make it a selector
                 # that finds them all
+                # This may be query-binding-specific
                 if not r.context.startswith('/'):
                     r.context = "//" + r.context
                 # If the context is the literal '/', pass 'None' as the context item to elementpath
                 if r.context == '/':
                     elements = [None]
                 else:
-                    elements = select(xml_doc, r.context, namespaces=self.ns_prefixes, variables=parser.variables)
+                    elements = self.query_binding.get_context_elements(xml_doc, r.context, namespaces=self.ns_prefixes, variables=parser.variables)
 
                 for element in elements:
                     # Important NOTE: the XPathContext can be modified by the evaluator!
@@ -174,7 +209,7 @@ class Pattern(object):
                 p_value = element.attrib['value']
                 self.variables[p_name] = p_value
             else:
-                raise SchematronException("Unknown element in pattern: %s: %s" % (self.id, element.tag))
+                raise SchematronError("Unknown element in pattern: %s: %s" % (self.id, element.tag))
 
     def read_from_file(self, file_path):
         # print("[XX] processing %s" % file_path)
@@ -200,7 +235,7 @@ class Rule(object):
                 assertion.read_from_element(element, variables)
                 self.assertions.append(assertion)
             else:
-                raise SchematronException("Unknown element in rule with context %s: %s" % (self.context, element.tag))
+                raise SchematronError("Unknown element in rule with context %s: %s" % (self.context, element.tag))
 
 
 class Assertion(object):

@@ -110,12 +110,14 @@ Not implemented:
 Partly implemented
 
 Implemented:
-- queryBinding XSLT2
+- queryBinding xslt
+- queryBinding xslt2
+- queryBinding check
 - title
 
 Not implemented:
+- full handling of querybindings as specified in the annexes
 - schemaVersion check
-- queryBinding check
 - defaultPhase
 - p
 - icon
