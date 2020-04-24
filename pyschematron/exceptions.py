@@ -1,8 +1,12 @@
+
 class SchematronError(Exception):
     pass
 
 class SchematronParseError(SchematronError):
     pass
 
-class SchematronNotSupportedError(SchematronError):
+class SchematronNotImplementedError(SchematronError):
+    pass
+
+class SchematronQueryBindingError(SchematronError):
     pass

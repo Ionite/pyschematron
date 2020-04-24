@@ -13,10 +13,10 @@ class WorkingDirectory(object):
         os.chdir(self.original_directory)
 
 
-def abstract_replace_vars(text, variables):
+def abstract_replace_vars(query_binding, text, variables):
     s = text
     # Reverse sort them by length, so a basic replace() call works
     keys = sorted(variables.keys(), key=len, reverse=True)
     for key in keys:
-        s = s.replace("$%s" % key, variables[key])
+        s = s.replace("%s%s" % (query_binding.get_abstract_pattern_delimiter(), key), variables[key])
     return s

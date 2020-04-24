@@ -60,7 +60,7 @@ Implemented
 
 ##### 5.4.8 param element
 
-Implemented, but currently as if they are variables, which is incorrect.
+Implemented
 
 ##### 5.4.9 pattern element
 

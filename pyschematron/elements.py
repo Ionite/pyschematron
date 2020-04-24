@@ -8,10 +8,12 @@ from lxml import etree
 
 from pyschematron.exceptions import *
 from pyschematron.util import WorkingDirectory, abstract_replace_vars
-from pyschematron.query_bindings import xslt2
+from pyschematron.query_bindings import xslt2, xpath2
 
 QUERY_BINDINGS = {
-    'xslt2': xslt2
+    'None': xslt2,
+    'xslt2': xslt2,
+    'xpath2': xpath2
 }
 
 class Schema(object):
@@ -35,6 +37,14 @@ class Schema(object):
         if filename is not None:
             self.read_from_file(filename)
 
+    def set_query_binding(self, query_binding):
+        if query_binding is None:
+            self.query_binding = QUERY_BINDINGS['xslt'].instantiate()
+        elif query_binding not in QUERY_BINDINGS:
+            raise SchematronNotImplementedError("Query Binding '%s' is not supported by this implementation" % self.query_binding)
+        else:
+            self.query_binding = QUERY_BINDINGS[query_binding].instantiate()
+
     def msg(self, level, msg):
         if self.verbosity >= level:
             print(msg)
@@ -53,13 +63,7 @@ class Schema(object):
         with WorkingDirectory(os.path.dirname(file_path)):
             root = xml.getroot()
             # Process the attributes
-            query_binding = root.attrib.get('queryBinding')
-            if query_binding is None:
-                self.query_binding = QUERY_BINDINGS['xslt']
-            elif query_binding not in QUERY_BINDINGS:
-                raise SchematronNotSupportedError("Query Binding '%s' is not supported by this implementation" % self.query_binding)
-            else:
-                self.query_binding = QUERY_BINDINGS[query_binding]
+            self.set_query_binding(root.attrib.get('queryBinding'))
 
             # Process the elements
             for element in root:
@@ -101,9 +105,9 @@ class Schema(object):
                 # for pk,pv in pattern.variables.items():
                 # Do Note: abstract is the pattern defining the rules; the isa origin defines the parameters
                 for rule in abstract.rules:
-                    rule.context = abstract_replace_vars(rule.context, pattern.variables)
+                    rule.context = abstract_replace_vars(self.query_binding, rule.context, pattern.params)
                     for assertion in rule.assertions:
-                        assertion.test = abstract_replace_vars(assertion.test, pattern.variables)
+                        assertion.test = abstract_replace_vars(self.query_binding, assertion.test, pattern.params)
 
     def validate_document(self, xml_doc):
         """
@@ -118,11 +122,9 @@ class Schema(object):
             # Variables themselves can be expressions,
             # so we evaluate them here, and replace the originals
             # with the result of the evaluation
-            if p.variables and 's' in p.variables:
+            if p.variables:
                 for name,value in p.variables.items():
-                    result = self.query_binding.parse_expression(xml_doc, value, self.ns_prefixes, p.variables)
-                    p.variables[name] = result
-
+                    p.variables[name] = self.query_binding.interpret_let_statement(xml_doc, value, self.ns_prefixes, p.variables)
 
             for r in p.rules:
                 # Contexts are essentially a findall(), so if it is not absolute, make it a selector
@@ -174,8 +176,9 @@ class Pattern(object):
         self.abstract = False
         self.isa = None
 
-        # is there a difference between let and param statements?
         self.variables = {}
+
+        self.params = {}
 
         self.id = None
         self.rules = []
@@ -196,10 +199,14 @@ class Pattern(object):
                 rule = Rule()
                 rule.read_from_element(element, self.variables)
                 self.rules.append(rule)
-            elif el_name == 'let' or el_name == 'param':
+            elif el_name == 'let':
                 p_name = element.attrib['name']
                 p_value = element.attrib['value']
                 self.variables[p_name] = p_value
+            elif el_name == 'param':
+                p_name = element.attrib['name']
+                p_value = element.attrib['value']
+                self.params[p_name] = p_value
             else:
                 raise SchematronError("Unknown element in pattern: %s: %s" % (self.id, element.tag))
 

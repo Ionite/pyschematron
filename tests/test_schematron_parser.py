@@ -120,7 +120,7 @@ class TestParseSchematron(unittest.TestCase):
                         self.assertTrue(result, a.text)
 
     def test_unknown_querybinding(self):
-        self.assertRaises(SchematronNotSupportedError, Schema, get_file("schematron", "unknown_querybinding.sch"))
+        self.assertRaises(SchematronNotImplementedError, Schema, get_file("schematron", "unknown_querybinding.sch"))
 
 
 class TestValidation(unittest.TestCase):
@@ -148,6 +148,12 @@ class TestValidation(unittest.TestCase):
         self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic_error_2.xml"), ["2"], [])
         self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic_warning_3.xml"), [], ["3"])
         self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic_warning_4.xml"), [], ["4"])
+
+class TestXpath2QueryBinding(unittest.TestCase):
+    def test_error_let_statement(self):
+        schema = Schema(get_file("schematron", "xpath2/error_let_statement.sch"))
+        xml_doc = etree.parse(get_file("xml", "basic_ok.xml"))
+        self.assertRaises(SchematronQueryBindingError, schema.validate_document, xml_doc)
 
 if __name__ == '__main__':
     unittest.main()
