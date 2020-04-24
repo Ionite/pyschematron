@@ -22,10 +22,6 @@ This tool takes a schematron file and an xml document, and directly validates th
 - lxml
 - elementpath (1.4.4 or higher)
 
-The version of elementpath we use is currently a development version available at [github](https://github.com/tjeb/elementpath) in the [jelte_fixes](https://github.com/tjeb/elementpath/tree/jelte_fixes) branch.
-
-This branch contains a number of workarounds for issues we encountered while testing with more advanced schematron files. We are working on getting these fixes upstream in elementpath, but for the moment, you'll need to install this particular branch (for instance with _pip install -e_)
-
 ### Roadmap
 
 This is an early beta, and it is not feature-complete yet, nor is the API frozen.
@@ -38,3 +34,9 @@ Plans for the (near) future
 - implement the processing steps as defined in section 6
 - additional documentation
 - add support for output formats of validator (text, svrl, json (format to be defined))
+
+Other things to work on:
+- performance improvement
+- XSD schema validation of input files (both schematron itself and optional xsd schemas for input xml documents) 
+- more output format options
+- Do we need a stand-alone xslt(2) transformer too?
