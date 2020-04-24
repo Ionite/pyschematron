@@ -8,10 +8,11 @@ from lxml import etree
 
 from pyschematron.exceptions import *
 from pyschematron.util import WorkingDirectory, abstract_replace_vars
-from pyschematron.query_bindings import xslt2, xpath2
+from pyschematron.query_bindings import xslt, xslt2, xpath2
 
 QUERY_BINDINGS = {
-    'None': xslt2,
+    'None': xslt,
+    'xslt': xslt,
     'xslt2': xslt2,
     'xpath2': xpath2
 }
@@ -41,7 +42,7 @@ class Schema(object):
         if query_binding is None:
             self.query_binding = QUERY_BINDINGS['xslt'].instantiate()
         elif query_binding not in QUERY_BINDINGS:
-            raise SchematronNotImplementedError("Query Binding '%s' is not supported by this implementation" % self.query_binding)
+            raise SchematronNotImplementedError("Query Binding '%s' is not supported by this implementation" % query_binding)
         else:
             self.query_binding = QUERY_BINDINGS[query_binding].instantiate()
 
@@ -118,7 +119,6 @@ class Schema(object):
         errors = []
         warnings = []
         for p in self.patterns:
-
             # Variables themselves can be expressions,
             # so we evaluate them here, and replace the originals
             # with the result of the evaluation

@@ -2,10 +2,13 @@
 from pyschematron.exceptions import SchematronError, SchematronNotImplementedError
 
 class QueryBinding(object):
+    #
+    # Mandatory to implement in derived classes
+    #
+
     def __init__(self):
         raise SchematronError("QueryBinding base class cannot be instantiated directly")
 
-    # Mandatory to implement in derived classes
     def get_name(self):
         """
         Return the query binding name

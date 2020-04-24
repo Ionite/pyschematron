@@ -112,6 +112,7 @@ Partly implemented
 Implemented:
 - queryBinding xslt
 - queryBinding xslt2
+- queryBinding xpath2
 - queryBinding check
 - title
 
