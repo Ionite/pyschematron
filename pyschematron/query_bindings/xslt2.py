@@ -15,3 +15,10 @@ def parse_expression(xml_document, expression, namespaces, variables):
     context = XPathContext(root=xml_document)
     result = root_node.evaluate(context)
     return result
+
+def evaluate_assertion(xml_document, context_element, namespaces, parser_variables, assertion):
+    parser = XPath2Parser(namespaces, parser_variables)
+    context = XPathContext(root=xml_document, item=context_element)
+    root_token = parser.parse(assertion)
+    result = root_token.evaluate(context=context)
+    return result

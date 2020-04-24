@@ -4,7 +4,6 @@ This module contains the schematron elements, as defined in the schematron defin
 """
 import os
 
-from elementpath import XPath2Parser, XPathContext
 from lxml import etree
 
 from pyschematron.exceptions import *
@@ -116,17 +115,13 @@ class Schema(object):
         warnings = []
         for p in self.patterns:
 
-            parser = XPath2Parser(self.ns_prefixes, p.variables)
-
             # Variables themselves can be expressions,
             # so we evaluate them here, and replace the originals
             # with the result of the evaluation
             if p.variables and 's' in p.variables:
-                for name,value in parser.variables.items():
+                for name,value in p.variables.items():
                     result = self.query_binding.parse_expression(xml_doc, value, self.ns_prefixes, p.variables)
                     p.variables[name] = result
-                    # Remove this one when parsing is fully done by querybinding
-                    parser.variables[name] = result
 
 
             for r in p.rules:
@@ -139,20 +134,17 @@ class Schema(object):
                 if r.context == '/':
                     elements = [None]
                 else:
-                    elements = self.query_binding.get_context_elements(xml_doc, r.context, namespaces=self.ns_prefixes, variables=parser.variables)
+                    elements = self.query_binding.get_context_elements(xml_doc, r.context, namespaces=self.ns_prefixes, variables=p.variables)
 
                 for element in elements:
                     # Important NOTE: the XPathContext can be modified by the evaluator!
                     # Not sure if this is intentional, but we need to make sure we re-initialize it
                     # for every assertion.
                     for a in r.assertions:
-                        context = XPathContext(root=xml_doc, item=element)
                         self.msg(3, "Start test: %s" % a.id)
                         self.msg(4, "Test context: %s" % str(r.context))
                         self.msg(4, "Test expression: %s" % a.test)
-                        root_token = parser.parse(a.test)
-
-                        result = root_token.evaluate(context=context)
+                        result = self.query_binding.evaluate_assertion(xml_doc, element, self.ns_prefixes, p.variables, a.test)
                         if not result:
                             self.msg(5, "Failed assertion")
                             self.msg(5, "Pattern: %s" % p.id)
