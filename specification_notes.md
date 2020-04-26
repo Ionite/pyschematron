@@ -41,12 +41,12 @@ Implemented
 Partly implemented
 
 Implemented:
+- let statements for schemas
 - let statements for patterns
+- let statements for rules
 
 Not implemented:
-- let statements for schemas
 - let statements for phases
-- let statements for rules
 - let statements without value attribute
 - check for multiply defined let statements
 
