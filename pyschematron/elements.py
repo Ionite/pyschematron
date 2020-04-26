@@ -158,8 +158,7 @@ class Schema(object):
         # - if not, continue the processing of rules
 
         schema_context = ValidationContext(self, xml_doc)
-
-        schema_context.add_variables(self.variables)
+        #schema_context.add_variables(self.variables)
 
         for p in self.patterns:
             # We track the fired rule for each element, since every document node should only have one rule
@@ -183,37 +182,10 @@ class Schema(object):
                         continue
                     fired_rules[element] = r.context
 
-                    r_errors, r_warnings = rule_context.validate_assertions()
+                    r_errors, r_warnings = rule_context.validate_assertions(element)
                     errors.extend(r_errors)
                     warnings.extend(r_warnings)
-                    # Important NOTE: the XPathContext can be modified by the evaluator!
-                    # Not sure if this is intentional, but we need to make sure we re-initialize it
-                    # for every assertion.
-                    for a in r.assertions:
-                        self.msg(3, "Start test: %s" % a.id)
-                        self.msg(4, "Test context: %s" % str(r.context))
-                        self.msg(4, "Test expression: %s" % a.test)
-                        result = self.query_binding.evaluate_assertion(xml_doc, element, self.ns_prefixes, rule_context.variables, a.test)
-                        if not result:
-                            self.msg(5, "Failed assertion")
-                            self.msg(5, "Pattern: %s" % p.id)
-                            self.msg(5, "Variables:")
-                            for k, v in rule_context.variables.items():
-                                self.msg(5, "  %s: %s" % (k, v))
-                            self.msg(5, "Context root: %s" % str(xml_doc.getroot()))
-                            self.msg(5, "Context item: %s" % r.context)
-                            self.msg(5, "CONTEXT ELEMENT: " + etree.tostring(element, pretty_print=True).decode('utf-8'))
-                            if 'id' in a.__dict__:
-                                self.msg(5, "Id: " + a.id)
-                            self.msg(5, "Test: '%s'" % a.test)
-                            self.msg(5, "Result: %s" % str(result))
 
-                            if a.flag == "warning":
-                                warnings.append(a)
-                            else:
-                                self.msg(5, "ELEMENTS: " + str(elements))
-                                # raise Exception(self.file_path)
-                                errors.append(a)
         return (errors, warnings)
 
 
