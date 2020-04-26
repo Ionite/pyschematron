@@ -30,8 +30,10 @@ Currently, validation works for a number of schematron files, and XSLT generatio
 
 Plans for the (near) future
 
+- add a Report data structure, to replace the return values of validate_document
+  This report structure should contain at least the information needed to create the result in svrl (i.e. the same output the xslt would produce)
 - go through the specification, and mark its element and sections as implemented/roadmap/not planned
-- implement the processing steps as defined in section 6
+- implement the other processing steps as defined in section 6
 - additional documentation
 - add support for output formats of validator (text, svrl, json (format to be defined))
 

@@ -172,11 +172,6 @@ class Schema(object):
                 pattern_variables[name] = self.query_binding.interpret_let_statement(xml_doc, value, self.ns_prefixes, pattern_variables)
 
             for r in p.rules:
-                # Contexts are essentially a findall(), so if it is not absolute, make it a selector
-                # that finds them all
-                # This may be query-binding-specific
-                #if not r.context.startswith('/'):
-                #    r.context = "/" + r.context
                 # If the context is the literal '/', pass 'None' as the context item to elementpath
                 if r.context == '/':
                     elements = [None]
