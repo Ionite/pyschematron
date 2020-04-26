@@ -25,15 +25,34 @@ class Schema(object):
         :param filename: If specified, parse the schematron definition in the given file
         :param verbosity: The verbosity level
         """
+
+        #
+        # Specification properties (elements)
+        #
+        # <include> elements are processed directly when reading files
         self.title = None
-        self.file_path = None
-        self.verbosity = verbosity
+        self.ns_prefixes = {}
+        #self.p (TODO)
+        self.variables = {}
+        #self.phases (TODO)
+        self.patterns = []
+        #self.diagnostics
+
+        # Specification properties (attributes)
+        self.id = None
+        self.see = None
+        self.fpi = None
+        self.xml_lang = None
+        self.xml_space = None
+        self.schemaVersion = None
+        self.defaultPhase = None
         self.query_binding = None
 
-        # Prefixes is a mapping of prefix to uri
-        self.ns_prefixes = {}
-        # A list of patterns
-        self.patterns = []
+        #
+        # Implementation properties
+        #
+        self.file_path = None
+        self.verbosity = verbosity
 
         if filename is not None:
             self.read_from_file(filename)
@@ -63,6 +82,13 @@ class Schema(object):
         with WorkingDirectory(os.path.dirname(file_path)):
             root = xml.getroot()
             # Process the attributes
+            self.id = root.attrib.get("id", "")
+            self.see = root.attrib.get("see", "")
+            self.fpi = root.attrib.get("fpi", "")
+            self.xml_lang = root.attrib.get("xml:lang", "")
+            self.xml_space = root.attrib.get("xml:space", "default")
+            self.schemaVersion = root.attrib.get("schemaVersion", "")
+            self.defaultPhase = root.attrib.get("defaultPhase", "")
             self.set_query_binding(root.attrib.get('queryBinding'))
 
             # Process the elements
@@ -74,6 +100,8 @@ class Schema(object):
                 el_name = etree.QName(element.tag).localname
                 if el_name == 'title':
                     self.title = element.text
+                elif el_name == 'let':
+                    self.variables[element.attrib['name']] = element.attrib['value']
                 elif el_name == 'ns':
                     self.ns_prefixes[element.attrib['prefix']] = element.attrib['uri']
                 elif el_name == 'pattern':
@@ -127,15 +155,21 @@ class Schema(object):
         # - if this element is already 'known', we can immediately process the assertions
         # - if not, continue the processing of rules
 
+        schema_variables = {}
+        if self.variables:
+            for name, value in self.variables.items():
+                schema_variables[name] = self.query_binding.interpret_let_statement(xml_doc, value, self.ns_prefixes, schema_variables)
+
         for p in self.patterns:
             # We track the fired rule for each element, since every document node should only have one rule
             fired_rules = {}
             # Variables themselves can be expressions,
             # so we evaluate them here, and replace the originals
             # with the result of the evaluation
-            if p.variables:
-                for name,value in p.variables.items():
-                    p.variables[name] = self.query_binding.interpret_let_statement(xml_doc, value, self.ns_prefixes, p.variables)
+            pattern_variables = schema_variables.copy()
+
+            for name,value in p.variables.items():
+                pattern_variables[name] = self.query_binding.interpret_let_statement(xml_doc, value, self.ns_prefixes, pattern_variables)
 
             for r in p.rules:
                 # Contexts are essentially a findall(), so if it is not absolute, make it a selector
@@ -147,7 +181,11 @@ class Schema(object):
                 if r.context == '/':
                     elements = [None]
                 else:
-                    elements = self.query_binding.get_context_elements(xml_doc, r.context, namespaces=self.ns_prefixes, variables=p.variables)
+                    elements = self.query_binding.get_context_elements(xml_doc, r.context, namespaces=self.ns_prefixes, variables=pattern_variables)
+
+                rule_variables = pattern_variables.copy()
+                for name, value in r.variables.items():
+                    rule_variables[name] = self.query_binding.interpret_let_statement(xml_doc, value, self.ns_prefixes, rule_variables)
 
                 for element in elements:
                     if element in fired_rules:
@@ -161,16 +199,16 @@ class Schema(object):
                         self.msg(3, "Start test: %s" % a.id)
                         self.msg(4, "Test context: %s" % str(r.context))
                         self.msg(4, "Test expression: %s" % a.test)
-                        result = self.query_binding.evaluate_assertion(xml_doc, element, self.ns_prefixes, p.variables, a.test)
+                        result = self.query_binding.evaluate_assertion(xml_doc, element, self.ns_prefixes, rule_variables, a.test)
                         if not result:
                             self.msg(5, "Failed assertion")
                             self.msg(5, "Pattern: %s" % p.id)
                             self.msg(5, "Variables:")
-                            for k, v in p.variables.items():
+                            for k, v in rule_variables.items():
                                 self.msg(5, "  %s: %s" % (k, v))
                             self.msg(5, "Context root: %s" % str(xml_doc.getroot()))
                             self.msg(5, "Context item: %s" % r.context)
-                            self.msg(5, "CONTEXT ELEMENT: " + str(element))
+                            self.msg(5, "CONTEXT ELEMENT: " + etree.tostring(element, pretty_print=True).decode('utf-8'))
                             if 'id' in a.__dict__:
                                 self.msg(5, "Id: " + a.id)
                             self.msg(5, "Test: '%s'" % a.test)
@@ -235,6 +273,7 @@ class Rule(object):
     def __init__(self):
         self.context = None
         self.assertions = []
+        self.variables = {}
         self.id = None
 
     def read_from_element(self, r_element, variables):
@@ -249,6 +288,10 @@ class Rule(object):
                 assertion = Assertion(rule=self)
                 assertion.read_from_element(element, variables)
                 self.assertions.append(assertion)
+            elif el_name == 'let':
+                p_name = element.attrib['name']
+                p_value = element.attrib['value']
+                self.variables[p_name] = p_value
             else:
                 raise SchematronError("Unknown element in rule with context %s: %s" % (self.context, element.tag))
 

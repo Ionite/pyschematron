@@ -202,5 +202,15 @@ class TestXpath2QueryBinding(unittest.TestCase):
         xml_doc = etree.parse(get_file("xml", "basic1_ok.xml"))
         self.assertRaises(SchematronQueryBindingError, schema.validate_document, xml_doc)
 
+class TestVariableSubstitution(unittest.TestCase):
+
+    def test_variables1(self):
+        schema = Schema(get_file("schematron", "variables/variables1_xslt2.sch"))
+        schema.verbosity = 5
+        xml_doc = etree.parse(get_file("xml", "variables/variables1_correct.xml"))
+        errors, warnings = schema.validate_document(xml_doc)
+        self.assertEqual([], errors, [e.test for e in errors])
+
+
 if __name__ == '__main__':
     unittest.main()
