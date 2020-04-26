@@ -10,11 +10,14 @@ from pyschematron.exceptions import *
 
 BASE_DIR = os.path.abspath("%s/../../" % __file__)
 
+
 def get_file(category, name):
     return os.path.join(BASE_DIR, "tests", "data", category, name)
 
+
 class TestIndividualStatements(unittest.TestCase):
     """Some individual tests to make sure our version of elementpath supports the necessary functionality"""
+
     def setUp(self):
         self.parser = XPath2Parser()
         self.xml_str = """<doc>
@@ -38,7 +41,8 @@ class TestIndividualStatements(unittest.TestCase):
         statement_root = self.parser.parse(statement)
         return statement_root.evaluate(context)
 
-    def check_statement(self, statement, expected_result, xml_doc=None, context_item=None, context_root=None, debug=False):
+    def check_statement(self, statement, expected_result, xml_doc=None, context_item=None, context_root=None,
+                        debug=False):
         if xml_doc is None:
             xml_doc = self.xml_doc
         if context_root is None:
@@ -66,7 +70,6 @@ class TestIndividualStatements(unittest.TestCase):
         result = statement_root.evaluate(context)
         self.assertNotEqual([], result, "Expected non-empty result for %s" % (statement))
 
-
     def test_element_type_coercion(self):
         self.check_statement("xs:decimal(\"12.34\")", Decimal('12.34'))
         self.check_statement("xs:decimal(element/decimal)", Decimal('12.34'))
@@ -87,15 +90,12 @@ class TestIndividualStatements(unittest.TestCase):
         context_root = self.xml_doc.find("doc")
         self.check_statement("exists(/*/element/name)", True, context_root=context_root)
 
-        #self.check_statement("exists(element/name)", True)
-        #self.check_statement("exists(element/decimal)", True)
-        #self.check_statement("exists(/decimal)", True)
-
-
+        # self.check_statement("exists(element/name)", True)
+        # self.check_statement("exists(element/decimal)", True)
+        # self.check_statement("exists(/decimal)", True)
 
     def test_empty_elements_xpath1(self):
         self.check_statement("* or normalize-space(text()) != ''", True)
-
 
 
 class TestParseSchematron(unittest.TestCase):
@@ -108,7 +108,7 @@ class TestParseSchematron(unittest.TestCase):
         variables = {}
         parser = XPath2Parser(schema.ns_prefixes, variables)
         for p in schema.patterns:
-            #print("[XX] %s has %d rules" % (p.id, len(p.rules)))
+            # print("[XX] %s has %d rules" % (p.id, len(p.rules)))
             for r in p.rules:
 
                 elements = select(doc, r.context)
@@ -143,23 +143,29 @@ class TestValidation(unittest.TestCase):
         self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic1_ok.xml"), [], [])
 
     def test_invalid_documents(self):
-        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic1_error_1.xml"), ["1"], [])
-        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic1_error_2.xml"), ["2"], [])
-        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic1_warning_3.xml"), [], ["3"])
-        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic1_warning_4.xml"), [], ["4"])
+        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic1_error_1.xml"), ["1"],
+                                     [])
+        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic1_error_2.xml"), ["2"],
+                                     [])
+        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic1_warning_3.xml"), [],
+                                     ["3"])
+        self.check_schema_validation(get_file("schematron", "basic.sch"), get_file("xml", "basic1_warning_4.xml"), [],
+                                     ["4"])
+
 
 class TestRuleOrder(unittest.TestCase):
     """
     This test is taken from the article at
     http://schematron.com/2018/07/the-most-common-programming-error-with-schematron/
     """
+
     def setUp(self):
         self.schema = Schema(get_file("schematron", "orderchecks/xslt.sch"))
 
     def validate(self, schema, xml_string):
         xml_doc = etree.ElementTree(etree.XML(xml_string))
         errors, warnings = schema.validate_document(xml_doc)
-        error_ruleid_list = [ e.rule.id for e in errors ]
+        error_ruleid_list = [e.rule.id for e in errors]
         return error_ruleid_list
 
     def check_rule_order(self, schematron_file):
@@ -167,7 +173,7 @@ class TestRuleOrder(unittest.TestCase):
 
         # Element a should match rule 1 only
         self.assertEqual([], self.validate(schema, '<a>1</a>'))
-        #self.assertEqual(['r1'], self.validate("<a>2</a>"))
+        # self.assertEqual(['r1'], self.validate("<a>2</a>"))
         self.assertEqual(['r1'], self.validate(schema, '<root id="1"><a>2</a></root>'))
 
         # Element c should match rule 3 only
@@ -184,8 +190,10 @@ class TestRuleOrder(unittest.TestCase):
 
         # Make sure this goes for nested elements too
         self.assertEqual([], self.validate(schema, '<arb id="a"><a>1</a><b>1</b><c>1</c><d>1</d><e id="1">1</e></arb>'))
-        self.assertEqual(['r4'], self.validate(schema, '<arb id="a"><a>1</a><b>1</b><c>1</c><d>2</d><e id="1">1</e></arb>'))
-        self.assertEqual(['r1', 'r2', 'r3', 'r4'], self.validate(schema, '<arb id="a"><a>2</a><b>2</b><c>2</c><d>2</d><e id="1">2</e></arb>'))
+        self.assertEqual(['r4'],
+                         self.validate(schema, '<arb id="a"><a>1</a><b>1</b><c>1</c><d>2</d><e id="1">1</e></arb>'))
+        self.assertEqual(['r1', 'r2', 'r3', 'r4'],
+                         self.validate(schema, '<arb id="a"><a>2</a><b>2</b><c>2</c><d>2</d><e id="1">2</e></arb>'))
 
     def test_order_xslt(self):
         self.check_rule_order("orderchecks/xslt.sch")
@@ -196,11 +204,13 @@ class TestRuleOrder(unittest.TestCase):
     def test_order_xpath2(self):
         self.check_rule_order("orderchecks/xpath2.sch")
 
+
 class TestXpath2QueryBinding(unittest.TestCase):
     def test_error_let_statement(self):
         schema = Schema(get_file("schematron", "xpath2/error_let_statement.sch"))
         xml_doc = etree.parse(get_file("xml", "basic1_ok.xml"))
         self.assertRaises(SchematronQueryBindingError, schema.validate_document, xml_doc)
+
 
 class TestVariableSubstitution(unittest.TestCase):
 

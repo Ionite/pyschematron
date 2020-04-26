@@ -1,4 +1,3 @@
-
 """
 This module contains the schematron elements, as defined in the schematron definition files
 """
@@ -9,6 +8,7 @@ from lxml import etree
 from pyschematron.exceptions import *
 from pyschematron.util import WorkingDirectory, abstract_replace_vars
 from pyschematron.query_bindings import xslt, xslt2, xpath2
+from pyschematron.validation import ValidationContext
 
 QUERY_BINDINGS = {
     'None': xslt,
@@ -16,6 +16,7 @@ QUERY_BINDINGS = {
     'xslt2': xslt2,
     'xpath2': xpath2
 }
+
 
 class Schema(object):
     def __init__(self, filename=None, verbosity=0):
@@ -32,11 +33,11 @@ class Schema(object):
         # <include> elements are processed directly when reading files
         self.title = None
         self.ns_prefixes = {}
-        #self.p (TODO)
+        # self.p (TODO)
         self.variables = {}
-        #self.phases (TODO)
+        # self.phases (TODO)
         self.patterns = []
-        #self.diagnostics
+        # self.diagnostics
 
         # Specification properties (attributes)
         self.id = None
@@ -61,7 +62,8 @@ class Schema(object):
         if query_binding is None:
             self.query_binding = QUERY_BINDINGS['xslt'].instantiate()
         elif query_binding not in QUERY_BINDINGS:
-            raise SchematronNotImplementedError("Query Binding '%s' is not supported by this implementation" % query_binding)
+            raise SchematronNotImplementedError(
+                "Query Binding '%s' is not supported by this implementation" % query_binding)
         else:
             self.query_binding = QUERY_BINDINGS[query_binding].instantiate()
 
@@ -137,7 +139,6 @@ class Schema(object):
                     for assertion in rule.assertions:
                         assertion.test = abstract_replace_vars(self.query_binding, assertion.test, pattern.params)
 
-
     def validate_document(self, xml_doc):
         """
         Validates the given xml document against this schematron schema.
@@ -155,10 +156,8 @@ class Schema(object):
         # - if this element is already 'known', we can immediately process the assertions
         # - if not, continue the processing of rules
 
-        schema_variables = {}
-        if self.variables:
-            for name, value in self.variables.items():
-                schema_variables[name] = self.query_binding.interpret_let_statement(xml_doc, value, self.ns_prefixes, schema_variables)
+        schema_context = ValidationContext(self, xml_doc)
+        # schema_context.add_variables(self.variables)
 
         for p in self.patterns:
             # We track the fired rule for each element, since every document node should only have one rule
@@ -166,55 +165,26 @@ class Schema(object):
             # Variables themselves can be expressions,
             # so we evaluate them here, and replace the originals
             # with the result of the evaluation
-            pattern_variables = schema_variables.copy()
-
-            for name,value in p.variables.items():
-                pattern_variables[name] = self.query_binding.interpret_let_statement(xml_doc, value, self.ns_prefixes, pattern_variables)
+            pattern_context = schema_context.copy()
+            pattern_context.set_pattern(p)
 
             for r in p.rules:
-                # If the context is the literal '/', pass 'None' as the context item to elementpath
-                if r.context == '/':
-                    elements = [None]
-                else:
-                    elements = self.query_binding.get_context_elements(xml_doc, r.context, namespaces=self.ns_prefixes, variables=pattern_variables)
+                rule_context = pattern_context.copy()
+                rule_context.set_rule(r)
 
-                rule_variables = pattern_variables.copy()
-                for name, value in r.variables.items():
-                    rule_variables[name] = self.query_binding.interpret_let_statement(xml_doc, value, self.ns_prefixes, rule_variables)
+                # If the context is the literal '/', pass 'None' as the context item to elementpath
+                elements = rule_context.get_rule_context_elements()
 
                 for element in elements:
                     if element in fired_rules:
                         # Already matched a rule, skip this one
                         continue
                     fired_rules[element] = r.context
-                    # Important NOTE: the XPathContext can be modified by the evaluator!
-                    # Not sure if this is intentional, but we need to make sure we re-initialize it
-                    # for every assertion.
-                    for a in r.assertions:
-                        self.msg(3, "Start test: %s" % a.id)
-                        self.msg(4, "Test context: %s" % str(r.context))
-                        self.msg(4, "Test expression: %s" % a.test)
-                        result = self.query_binding.evaluate_assertion(xml_doc, element, self.ns_prefixes, rule_variables, a.test)
-                        if not result:
-                            self.msg(5, "Failed assertion")
-                            self.msg(5, "Pattern: %s" % p.id)
-                            self.msg(5, "Variables:")
-                            for k, v in rule_variables.items():
-                                self.msg(5, "  %s: %s" % (k, v))
-                            self.msg(5, "Context root: %s" % str(xml_doc.getroot()))
-                            self.msg(5, "Context item: %s" % r.context)
-                            self.msg(5, "CONTEXT ELEMENT: " + etree.tostring(element, pretty_print=True).decode('utf-8'))
-                            if 'id' in a.__dict__:
-                                self.msg(5, "Id: " + a.id)
-                            self.msg(5, "Test: '%s'" % a.test)
-                            self.msg(5, "Result: %s" % str(result))
 
-                            if a.flag == "warning":
-                                warnings.append(a)
-                            else:
-                                self.msg(5, "ELEMENTS: " + str(elements))
-                                # raise Exception(self.file_path)
-                                errors.append(a)
+                    r_errors, r_warnings = rule_context.validate_assertions(element)
+                    errors.extend(r_errors)
+                    warnings.extend(r_warnings)
+
         return (errors, warnings)
 
 
