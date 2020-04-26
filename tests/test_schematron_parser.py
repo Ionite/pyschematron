@@ -133,9 +133,11 @@ class TestValidation(unittest.TestCase):
         schema = Schema(schema_file)
         xml_doc = etree.parse(xml_file)
 
-        errors, warnings = schema.validate_document(xml_doc)
-        error_id_list = [e.id for e in errors]
-        warning_id_list = [w.id for w in warnings]
+        report = schema.validate_document(xml_doc)
+        errors = report.get_failed_asserts()
+        error_id_list = [e.id for e in errors if e.flag != 'warning']
+        warnings = report.get_failed_asserts()
+        warning_id_list = [w.id for w in warnings if w.flag == 'warning']
         self.assertEqual(expected_errors, error_id_list)
         self.assertEqual(expected_warnings, warning_id_list)
 
@@ -164,7 +166,8 @@ class TestRuleOrder(unittest.TestCase):
 
     def validate(self, schema, xml_string):
         xml_doc = etree.ElementTree(etree.XML(xml_string))
-        errors, warnings = schema.validate_document(xml_doc)
+        report = schema.validate_document(xml_doc)
+        errors = report.get_failed_asserts()
         error_ruleid_list = [e.rule.id for e in errors]
         return error_ruleid_list
 
@@ -218,7 +221,8 @@ class TestVariableSubstitution(unittest.TestCase):
         schema = Schema(get_file("schematron", "variables/variables1_xslt2.sch"))
         schema.verbosity = 5
         xml_doc = etree.parse(get_file("xml", "variables/variables1_correct.xml"))
-        errors, warnings = schema.validate_document(xml_doc)
+        report = schema.validate_document(xml_doc)
+        errors = report.get_failed_asserts()
         self.assertEqual([], errors, [e.test for e in errors])
 
 

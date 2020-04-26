@@ -1,4 +1,5 @@
 from lxml import etree
+from collections import OrderedDict
 
 class ValidationContext(object):
     """
@@ -49,9 +50,7 @@ class ValidationContext(object):
                                                                   namespaces=self.schema.ns_prefixes,
                                                                   variables=self.variables)
 
-    def validate_assertions(self, element):
-        errors = []
-        warnings = []
+    def validate_assertions(self, element, report):
         r = self.rule
         for a in r.assertions:
             self.msg(3, "Start test: %s" % a.id)
@@ -73,10 +72,28 @@ class ValidationContext(object):
                 self.msg(5, "Test: '%s'" % a.test)
                 self.msg(5, "Result: %s" % str(result))
 
-                if a.flag == "warning":
-                    warnings.append(a)
-                else:
-                    # raise Exception(self.file_path)
-                    errors.append(a)
+                report.add_failed_assert(self, a)
 
-        return errors, warnings
+
+class ValidationReport(object):
+    def __init__(self):
+        self.fired_rules = OrderedDict()
+
+    def add_fired_rule(self, rule_context):
+        self.fired_rules[rule_context] = []
+
+    def add_failed_assert(self, rule_context, assertion):
+        self.fired_rules[rule_context].append(assertion)
+
+    def get_failed_asserts(self):
+        result = []
+        for failed_asserts in self.fired_rules.values():
+            result.extend(failed_asserts)
+        return result
+
+    def get_failed_asserts_flag(self, flag):
+        result = []
+        for failed_asserts in self.fired_rules.values():
+            result.extend([fa for fa in failed_asserts if fa.flag == flag])
+        return result
+

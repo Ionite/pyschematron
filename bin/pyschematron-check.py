@@ -22,13 +22,17 @@ def main():
     schema.process_abstract_patterns()
 
     doc = etree.parse(args.xml_file)
-    errors, warnings = schema.validate_document(doc)
+    report = schema.validate_document(doc)
+    errors = report.get_failed_asserts_flag(None)
+    errors.extend(report.get_failed_asserts_flag("fatal"))
+    warnings = report.get_failed_asserts_flag("warning")
+    #warnings = []
 
     if args.verbosity > 0:
         for error in errors:
             print("Error: %s" % error.text)
         for warning in warnings:
-            print("Error: %s" % warning.text)
+            print("Warning: %s" % warning.text)
 
     if args.verbosity > 0:
         print("File: %s" % args.xml_file)

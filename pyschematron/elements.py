@@ -8,7 +8,7 @@ from lxml import etree
 from pyschematron.exceptions import *
 from pyschematron.util import WorkingDirectory, abstract_replace_vars
 from pyschematron.query_bindings import xslt, xslt2, xpath2
-from pyschematron.validation import ValidationContext
+from pyschematron.validation import ValidationContext, ValidationReport
 
 QUERY_BINDINGS = {
     'None': xslt,
@@ -145,8 +145,7 @@ class Schema(object):
 
         :return: a tuple ([errors], [warnings])
         """
-        errors = []
-        warnings = []
+        report = ValidationReport()
 
         # Idea for performance improvement:
         # - loop over the actual elements in the document
@@ -172,6 +171,8 @@ class Schema(object):
                 rule_context = pattern_context.copy()
                 rule_context.set_rule(r)
 
+                report.add_fired_rule(rule_context)
+
                 # If the context is the literal '/', pass 'None' as the context item to elementpath
                 elements = rule_context.get_rule_context_elements()
 
@@ -181,11 +182,9 @@ class Schema(object):
                         continue
                     fired_rules[element] = r.context
 
-                    r_errors, r_warnings = rule_context.validate_assertions(element)
-                    errors.extend(r_errors)
-                    warnings.extend(r_warnings)
+                    rule_context.validate_assertions(element, report)
 
-        return (errors, warnings)
+        return report
 
 
 class Pattern(object):
@@ -277,5 +276,5 @@ class Assertion(object):
         if 'flag' in a_element.attrib:
             self.flag = a_element.attrib['flag']
         else:
-            self.flag = "fatal"
+            self.flag = "error"
         self.text = a_element.text
