@@ -86,14 +86,38 @@ class ValidationReport(object):
         self.fired_rules[rule_context].append(assertion)
 
     def get_failed_asserts(self):
+        """
+        Return all failed asserts as a list
+        :param flag: The flag to filter for
+        :return: A list of failed asserts
+        """
         result = []
         for failed_asserts in self.fired_rules.values():
             result.extend(failed_asserts)
         return result
 
     def get_failed_asserts_flag(self, flag):
+        """
+        Return the failed asserts with the given flag value
+        :param flag: The flag to filter for
+        :return: A list of failed asserts
+        """
         result = []
         for failed_asserts in self.fired_rules.values():
             result.extend([fa for fa in failed_asserts if fa.flag == flag])
         return result
 
+    def get_failed_asserts_by_flag(self, default_flag=None):
+        """
+        Returns a dict of failed asserts, keyed by their flags.
+        If default flag is given, asserts that did not have a flag are added to the list of asserts with the given flag
+        :return:
+        """
+        result = {}
+        for failed_asserts in self.fired_rules.values():
+            for failed_assert in failed_asserts:
+                assert_flag = failed_assert.flag
+                if assert_flag is None:
+                    assert_flag = default_flag
+                result[assert_flag] = failed_assert
+        return result

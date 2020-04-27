@@ -219,11 +219,28 @@ class TestVariableSubstitution(unittest.TestCase):
 
     def test_variables1(self):
         schema = Schema(get_file("schematron", "variables/variables1_xslt2.sch"))
-        schema.verbosity = 5
         xml_doc = etree.parse(get_file("xml", "variables/variables1_correct.xml"))
         report = schema.validate_document(xml_doc)
         errors = report.get_failed_asserts()
         self.assertEqual([], errors, [e.test for e in errors])
+
+class TestFullSchematronSample(unittest.TestCase):
+    def setUp(self):
+        self.schema = Schema(get_file("schematron", "full.sch"))
+
+    def test_ok(self):
+        xml_doc = etree.parse(get_file("xml", "basic1_ok.xml"))
+        report = self.schema.validate_document(xml_doc)
+        failed_asserts = report.get_failed_asserts_by_flag()
+        self.assertEqual({}, failed_asserts)
+
+    def test_bad_1(self):
+        xml_doc = etree.parse(get_file("xml", "basic1_error_1.xml"))
+        report = self.schema.validate_document(xml_doc)
+        # Should fail for both builtin and included assert
+        self.assertEqual(2, len(report.get_failed_asserts_by_flag()))
+        self.assertEqual(1, len(report.get_failed_asserts_flag("builtin_existence")))
+        self.assertEqual(1, len(report.get_failed_asserts_flag("included_existence")))
 
 
 if __name__ == '__main__':
