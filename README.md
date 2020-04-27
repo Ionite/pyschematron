@@ -30,7 +30,7 @@ Currently, validation works for a number of schematron files, and XSLT generatio
 
 Plans for the (near) future
 
-- add a Report data structure, to replace the return values of validate_document
+- extend the Report data structure
   This report structure should contain at least the information needed to create the result in svrl (i.e. the same output the xslt would produce)
 - go through the specification, and mark its element and sections as implemented/roadmap/not planned
 - implement the other processing steps as defined in section 6
@@ -42,3 +42,4 @@ Other things to work on:
 - XSD schema validation of input files (both schematron itself and optional xsd schemas for input xml documents) 
 - more output format options
 - Do we need a stand-alone xslt(2) transformer too?
+- Would a code generator make sense?
