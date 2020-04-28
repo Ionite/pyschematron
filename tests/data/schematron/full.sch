@@ -5,8 +5,28 @@
 -->
 <schema
     xmlns="http://purl.oclc.org/dsdl/schematron"
-    queryBinding="xslt2">
+    queryBinding="xslt2"
+    defaultPhase="builtin_and_included">
     <title>Full schematron</title>
+
+    <phase id="builtin_and_included">
+        <let name="number_minimum" value="0" />
+        <active pattern="builtin" />
+        <active pattern="included" />
+    </phase>
+    <phase id="builtin_only">
+        <let name="number_minimum" value="0" />
+        <active pattern="builtin" />
+    </phase>
+    <phase id="included_only">
+        <let name="number_minimum" value="0" />
+        <active pattern="included" />
+    </phase>
+
+    <phase id="phase_with_unknown_pattern">
+        <active pattern="unknown_pattern" />
+    </phase>
+
 
     <!-- Built-in pattern -->
     <pattern xmlns="http://purl.oclc.org/dsdl/schematron" id="builtin">
@@ -15,7 +35,7 @@
             <assert test="Number" id="builtin_2" flag="builtin_existence">Document data must have a number</assert>
         </rule>
         <rule context="Document/Data/Number">
-            <assert test=". &gt; 0" id="builtin_3" flag="builtin_value">Number should be positive</assert>
+            <assert test=". &gt; $number_minimum" id="builtin_3" flag="builtin_value">Number too low</assert>
         </rule>
         <rule context="Document/Data/Name">
             <assert test="ends-with(., 'ello')" id="builtin_4" flag="builtin_value">Name should end with 'ello'</assert>

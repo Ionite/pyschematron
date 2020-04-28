@@ -5,6 +5,9 @@
 # Copyright (c) 2020 Ionite
 # See LICENSE for the license
 
+# This module provides semi-hardcoded XML output for XSLT generation,
+# based on the XSLT output of the schematron skeleton implementation
+
 # For escaping
 from html import escape
 
@@ -214,7 +217,7 @@ def schema_to_xsl(schema):
             # Store mode id in the pattern for the next loop
             pattern.mode_id = pattern_mode_id
             if pattern.isa:
-                abstract = schema.find_pattern(pattern.isa)
+                abstract = schema.get_pattern(pattern.isa)
                 abstract.mode_id = pattern_mode_id
             pattern_mode_id += 1
     result.append('  ')
@@ -225,7 +228,7 @@ def schema_to_xsl(schema):
     for pattern in schema.patterns:
         if not pattern.abstract:
             if pattern.isa:
-                pattern = schema.find_pattern(pattern.isa)
+                pattern = schema.get_pattern(pattern.isa)
                 #raise Exception("pattern %s has rules but is an is-a" % pattern.id)
             result.append('  <!--PATTERN %s-->' % pattern.id)
 

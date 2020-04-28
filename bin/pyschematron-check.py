@@ -14,6 +14,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('schematron_file', help='the schematron file to process')
     parser.add_argument('xml_file', help='the xml file to validate')
+    parser.add_argument('-p', '--phase', default="#DEFAULT", help="The phase to run")
     parser.add_argument('-v', '--verbosity', type=int, default=1, help='verbosity (0 for no output, 5 for full debug output)')
     args = parser.parse_args()
 
@@ -22,7 +23,7 @@ def main():
     schema.process_abstract_patterns()
 
     doc = etree.parse(args.xml_file)
-    report = schema.validate_document(doc)
+    report = schema.validate_document(doc, phase=args.phase)
     errors = report.get_failed_asserts_flag(None)
     errors.extend(report.get_failed_asserts_flag("fatal"))
     warnings = report.get_failed_asserts_flag("warning")

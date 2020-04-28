@@ -1,6 +1,7 @@
 """
 This module contains the schematron elements, as defined in the schematron definition files
 """
+import copy
 import os
 
 from lxml import etree
@@ -35,18 +36,18 @@ class Schema(object):
         self.ns_prefixes = {}
         # self.p (TODO)
         self.variables = {}
-        # self.phases (TODO)
-        self.patterns = []
+        self.phases = {}
+        self.patterns = {}
         # self.diagnostics
 
         # Specification properties (attributes)
         self.id = None
+        self.default_phase = None
         self.see = None
         self.fpi = None
         self.xml_lang = None
         self.xml_space = None
         self.schemaVersion = None
-        self.defaultPhase = None
         self.query_binding = None
 
         #
@@ -90,7 +91,7 @@ class Schema(object):
             self.xml_lang = root.attrib.get("xml:lang", "")
             self.xml_space = root.attrib.get("xml:space", "default")
             self.schemaVersion = root.attrib.get("schemaVersion", "")
-            self.defaultPhase = root.attrib.get("defaultPhase", "")
+            self.default_phase = root.attrib.get("defaultPhase", "#ALL")
             self.set_query_binding(root.attrib.get('queryBinding'))
 
             # Process the elements
@@ -109,43 +110,78 @@ class Schema(object):
                 elif el_name == 'pattern':
                     pattern = Pattern()
                     pattern.read_from_element(element)
-                    self.patterns.append(pattern)
+                    if pattern.id in self.patterns:
+                        raise SchematronError("Duplicate pattern: %s" % pattern.id)
+                    self.patterns[pattern.id] = pattern
+                elif el_name == 'phase':
+                    phase = Phase()
+                    phase.read_from_element(element)
+                    self.phases[phase.id] = phase
                 elif el_name == 'include':
                     pattern = Pattern()
                     pattern.read_from_file(element.attrib['href'])
-                    self.patterns.append(pattern)
+                    if pattern.id in self.patterns:
+                        raise SchematronError("Duplicate pattern: %s" % pattern.id)
+                    self.patterns[pattern.id] = pattern
                 else:
                     raise SchematronError("Unknown element in schematron file: %s" % element.tag)
 
         if process_abstract_patterns:
             self.process_abstract_patterns()
 
-    def find_pattern(self, id):
-        for pattern in self.patterns:
-            if pattern.id == id:
-                return pattern
-        raise SchematronError("Can't find pattern %s" % id)
+    def get_pattern(self, pattern_id):
+        if pattern_id in self.patterns:
+            return self.patterns[pattern_id]
+        else:
+            raise SchematronError("Unknown pattern: %s" % pattern_id)
 
     def process_abstract_patterns(self):
-        for pattern in self.patterns:
+        for pattern in self.patterns.values():
             if pattern.isa is not None:
                 # print("applying %s to %s" % (pattern.isa, pattern.id))
                 # print("rule count: %d" % len(pattern.rules))
-                abstract = self.find_pattern(pattern.isa)
+                abstract = self.get_pattern(pattern.isa)
+                pattern.isa = None
                 # for pk,pv in pattern.variables.items():
                 # Do Note: abstract is the pattern defining the rules; the isa origin defines the parameters
-                for rule in abstract.rules:
+                for rule in [r.copy() for r in abstract.rules]:
+                    # Copy the rule, with the parameters replaced, into the 'is-a' pattern
                     rule.context = abstract_replace_vars(self.query_binding, rule.context, pattern.params)
                     for assertion in rule.assertions:
                         assertion.test = abstract_replace_vars(self.query_binding, assertion.test, pattern.params)
+                    pattern.rules.append(rule)
 
-    def validate_document(self, xml_doc):
+    def get_patterns_for_phase(self, phase_name):
+        if phase_name == "#ALL":
+            return [pattern for pattern in self.patterns.values() if not pattern.abstract]
+        else:
+            result = []
+            phase = self.get_phase(phase_name)
+            for pattern_id in phase.active_patterns:
+                pattern = self.get_pattern(pattern_id)
+                if pattern.abstract:
+                    raise SchematronError("Phase %s contains active pattern %s, only non-abstract patterns can be specified" % (phase_name, pattern_id))
+                result.append(pattern)
+            return result
+
+    def get_phase(self, phase_name):
+        if phase_name in self.phases:
+            return self.phases[phase_name]
+        else:
+            raise SchematronError("Unknown phase: %s" % phase_name)
+
+    def validate_document(self, xml_doc, phase="#DEFAULT"):
         """
         Validates the given xml document against this schematron schema.
 
         :return: a tuple ([errors], [warnings])
         """
         report = ValidationReport()
+
+        if phase == "#DEFAULT":
+            phase = self.default_phase
+
+        patterns = self.get_patterns_for_phase(phase)
 
         # Idea for performance improvement:
         # - loop over the actual elements in the document
@@ -156,9 +192,10 @@ class Schema(object):
         # - if not, continue the processing of rules
 
         schema_context = ValidationContext(self, xml_doc)
-        # schema_context.add_variables(self.variables)
+        if phase != "#ALL":
+            schema_context.add_variables(self.phases[phase].variables)
 
-        for p in self.patterns:
+        for p in patterns:
             # We track the fired rule for each element, since every document node should only have one rule
             fired_rules = {}
             # Variables themselves can be expressions,
@@ -180,11 +217,35 @@ class Schema(object):
                     if element in fired_rules:
                         # Already matched a rule, skip this one
                         continue
+                    # Mark this element as having fired a rule (so it can be skipped later, if
+                    # it matches other rules as well)
                     fired_rules[element] = r.context
 
                     rule_context.validate_assertions(element, report)
 
         return report
+
+class Phase(object):
+    def __init__(self):
+        self.id = None
+        self.active_patterns = []
+        self.variables = {}
+
+    def read_from_element(self, phase_element):
+        self.id = phase_element.attrib['id']
+        for element in phase_element:
+            cls = element.__class__.__name__
+            if cls == "_Comment":
+                continue
+            el_name = etree.QName(element.tag).localname
+            if el_name == 'active':
+                self.active_patterns.append(element.attrib["pattern"])
+            elif el_name == 'let':
+                p_name = element.attrib['name']
+                p_value = element.attrib['value']
+                self.variables[p_name] = p_value
+            else:
+                raise SchematronError("Unknown element in phase: %s: %s" % (self.id, element.tag))
 
 
 class Pattern(object):
@@ -227,11 +288,9 @@ class Pattern(object):
                 raise SchematronError("Unknown element in pattern: %s: %s" % (self.id, element.tag))
 
     def read_from_file(self, file_path):
-        # print("[XX] processing %s" % file_path)
         xml = etree.parse(file_path)
         with WorkingDirectory(os.path.dirname(file_path)):
             self.read_from_element(xml.getroot())
-
 
 class Rule(object):
     def __init__(self):
@@ -239,6 +298,14 @@ class Rule(object):
         self.assertions = []
         self.variables = {}
         self.id = None
+
+    def copy(self):
+        new_rule = Rule()
+        new_rule.context = self.context
+        new_rule.id = self.id
+        new_rule.assertions = self.assertions[:]
+        new_rule.variables = copy.deepcopy(self.variables)
+        return new_rule
 
     def read_from_element(self, r_element, variables):
         self.context = r_element.attrib['context']

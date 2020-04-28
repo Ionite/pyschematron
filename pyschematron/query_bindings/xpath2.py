@@ -17,12 +17,6 @@ class XPath2Binding(QueryBinding):
     def __init__(self):
         self.name = "xpath2"
 
-    def xpath2_find_all(self, root, expr, namespaces, variables):
-        result = []
-        for el in root.iter():
-            result.extend(select(root, expr, namespaces=namespaces, variables=variables))
-        return result
-
     def get_context_elements(self, xml_document, rule_context, namespaces, variables):
         result = select(xml_document, rule_context, namespaces=namespaces, variables=variables)
         if rule_context.startswith('/'):
@@ -38,16 +32,6 @@ class XPath2Binding(QueryBinding):
         root_node = parser.parse(expression)
         context = XPathContext(root=xml_document)
         result = root_node.evaluate(context)
-        return result
-
-    def find_xpath_nodes(self, xml_document, element, context, namespaces, variables):
-        parser = XPath2Parser(namespaces, variables)
-        root_node = parser.parse(context)
-        context = XPathContext(root=xml_document, item=element)
-        result = root_node.evaluate(context)
-        print("[XX] RESULT: " + str(result))
-        #xp_r = element.xpath(context, namespaces=namespaces, **variables)
-        #return xp_r
         return result
 
     def evaluate_assertion(self, xml_document, context_element, namespaces, parser_variables, assertion):

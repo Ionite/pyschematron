@@ -107,7 +107,7 @@ class TestParseSchematron(unittest.TestCase):
 
         variables = {}
         parser = XPath2Parser(schema.ns_prefixes, variables)
-        for p in schema.patterns:
+        for p in schema.patterns.values():
             # print("[XX] %s has %d rules" % (p.id, len(p.rules)))
             for r in p.rules:
 
@@ -237,10 +237,31 @@ class TestFullSchematronSample(unittest.TestCase):
     def test_bad_1(self):
         xml_doc = etree.parse(get_file("xml", "basic1_error_1.xml"))
         report = self.schema.validate_document(xml_doc)
-        # Should fail for both builtin and included assert
         self.assertEqual(2, len(report.get_failed_asserts_by_flag()))
         self.assertEqual(1, len(report.get_failed_asserts_flag("builtin_existence")))
         self.assertEqual(1, len(report.get_failed_asserts_flag("included_existence")))
+
+    def test_phases(self):
+        xml_doc = etree.parse(get_file("xml", "basic1_error_1.xml"))
+        report = self.schema.validate_document(xml_doc, phase="builtin_and_included")
+        self.assertEqual(2, len(report.get_failed_asserts_by_flag()))
+        self.assertEqual(1, len(report.get_failed_asserts_flag("builtin_existence")))
+        self.assertEqual(1, len(report.get_failed_asserts_flag("included_existence")))
+
+        report = self.schema.validate_document(xml_doc, phase="builtin_only")
+        self.assertEqual(1, len(report.get_failed_asserts_by_flag()))
+        self.assertEqual(1, len(report.get_failed_asserts_flag("builtin_existence")))
+        self.assertEqual(0, len(report.get_failed_asserts_flag("included_existence")))
+
+        report = self.schema.validate_document(xml_doc, phase="included_only")
+        self.assertEqual(1, len(report.get_failed_asserts_by_flag()))
+        self.assertEqual(0, len(report.get_failed_asserts_flag("builtin_existence")))
+        self.assertEqual(1, len(report.get_failed_asserts_flag("included_existence")))
+
+        self.assertRaises(SchematronError, self.schema.validate_document, xml_doc, "unknown_phase")
+        self.assertEqual("phase_with_unknown_pattern", self.schema.get_phase("phase_with_unknown_pattern").id)
+        self.assertRaises(SchematronError, self.schema.validate_document, xml_doc, "phase_with_unknown_pattern")
+
 
 
 if __name__ == '__main__':

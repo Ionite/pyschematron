@@ -42,11 +42,11 @@ Partly implemented
 
 Implemented:
 - let statements for schemas
+- let statements for phases
 - let statements for patterns
 - let statements for rules
 
 Not implemented:
-- let statements for phases
 - let statements without value attribute
 - check for multiply defined let statements
 
@@ -82,7 +82,7 @@ Not implemented:
 
 ##### 5.4.10 phase element
 
-Not implemented
+Implemented
 
 ##### 5.4.11 report element
 
