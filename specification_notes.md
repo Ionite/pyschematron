@@ -38,16 +38,7 @@ Implemented
 
 ##### 5.4.5 let element
 
-Partly implemented
-
-Implemented:
-- let statements for schemas
-- let statements for phases
-- let statements for patterns
-- let statements for rules
-
-Not implemented:
-- check for multiply defined let statements
+Implemented
 
 ##### 5.4.6 name element
 
