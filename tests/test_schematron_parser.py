@@ -224,6 +224,11 @@ class TestVariableSubstitution(unittest.TestCase):
         errors = report.get_failed_asserts()
         self.assertEqual([], errors, [e.test for e in errors])
 
+    def test_variables_multiple_error(self):
+        schema = Schema(get_file("schematron", "variables/variables1_xslt2_multiple_error.sch"))
+        xml_doc = etree.parse(get_file("xml", "variables/variables1_correct.xml"))
+        self.assertRaises(SchematronError, schema.validate_document, xml_doc)
+
 class TestFullSchematronSample(unittest.TestCase):
     def setUp(self):
         self.schema = Schema(get_file("schematron", "full.sch"))

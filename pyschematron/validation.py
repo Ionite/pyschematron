@@ -1,6 +1,8 @@
 from lxml import etree
 from collections import OrderedDict
 
+from pyschematron.exceptions import SchematronError
+
 class ValidationContext(object):
     """
     Holds all the relevant data for an assertion to be validated
@@ -24,6 +26,8 @@ class ValidationContext(object):
 
     def add_variables(self, variables):
         for name, value in variables.items():
+            if name in self.variables:
+                raise SchematronError("Variable %s is declared multiple times within the same context" % name)
             self.variables[name] = self.schema.query_binding.interpret_let_statement(self.xml_doc, value, self.schema.ns_prefixes, self.variables)
 
     def copy(self):
