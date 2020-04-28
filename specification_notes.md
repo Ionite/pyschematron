@@ -114,11 +114,11 @@ Implemented:
 - queryBinding xslt2
 - queryBinding xpath2
 - queryBinding check
+- defaultPhase
 - title
 
 Not implemented:
 - schemaVersion check
-- defaultPhase
 - p
 - icon
 - see
