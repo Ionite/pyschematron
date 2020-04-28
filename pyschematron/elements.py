@@ -104,7 +104,7 @@ class Schema(object):
                 if el_name == 'title':
                     self.title = element.text
                 elif el_name == 'let':
-                    self.variables[element.attrib['name']] = element.attrib['value']
+                    self.variables[element.attrib['name']] = element.attrib.get('value', element.text)
                 elif el_name == 'ns':
                     self.ns_prefixes[element.attrib['prefix']] = element.attrib['uri']
                 elif el_name == 'pattern':

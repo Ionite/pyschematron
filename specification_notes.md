@@ -47,7 +47,6 @@ Implemented:
 - let statements for rules
 
 Not implemented:
-- let statements without value attribute
 - check for multiply defined let statements
 
 ##### 5.4.6 name element
