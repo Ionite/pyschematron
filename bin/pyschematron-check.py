@@ -24,10 +24,12 @@ def main():
 
     doc = etree.parse(args.xml_file)
     report = schema.validate_document(doc, phase=args.phase)
-    errors = report.get_failed_asserts_flag(None)
-    errors.extend(report.get_failed_asserts_flag("fatal"))
-    warnings = report.get_failed_asserts_flag("warning")
-    #warnings = []
+    # Split up the failed asserts by flag; assert with flag
+    # 'warning' are considered warnings, asserts with any
+    # other flag are considered errors
+    failed_asserts = report.get_failed_asserts_by_flag()
+    warnings = failed_asserts.pop('warning', [])
+    errors = failed_asserts.values()
 
     if args.verbosity > 0:
         for error in errors:

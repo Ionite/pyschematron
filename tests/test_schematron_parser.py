@@ -1,3 +1,4 @@
+from io import StringIO
 import os
 import unittest
 
@@ -5,6 +6,8 @@ from elementpath import XPath2Parser, XPathContext, select
 from decimal import Decimal
 from lxml import etree
 
+from pyschematron.elementpath_extensions.xslt1_parser import XSLT1Parser
+from pyschematron.elementpath_extensions.select import select_with_context
 from pyschematron.elements import Schema
 from pyschematron.exceptions import *
 
@@ -229,6 +232,7 @@ class TestVariableSubstitution(unittest.TestCase):
         xml_doc = etree.parse(get_file("xml", "variables/variables1_correct.xml"))
         self.assertRaises(SchematronError, schema.validate_document, xml_doc)
 
+
 class TestFullSchematronSample(unittest.TestCase):
     def setUp(self):
         self.schema = Schema(get_file("schematron", "full.sch"))
@@ -267,6 +271,45 @@ class TestFullSchematronSample(unittest.TestCase):
         self.assertEqual("phase_with_unknown_pattern", self.schema.get_phase("phase_with_unknown_pattern").id)
         self.assertRaises(SchematronError, self.schema.validate_document, xml_doc, "phase_with_unknown_pattern")
 
+
+class TestXSLT1Parser(unittest.TestCase):
+    def test_current(self):
+        xml_doc = etree.parse(StringIO("""
+        <root>
+            <element id="a">value</element>
+            <element id="b" ref="a">other value</element>
+        </root>
+        """))
+        expr = "current()"
+        for node in xml_doc.iter():
+            nodes = select_with_context(xml_doc, node, expr, parser=XSLT1Parser)
+            self.assertEqual([node], nodes)
+
+        node_a = select(xml_doc, "//element")[0]
+        node_b = select(xml_doc, "//element")[1]
+        ref_node = select(xml_doc, "//element[@ref]")[0]
+        nodes = select_with_context(xml_doc, ref_node, "/root/element[@id=current()/@ref]", parser=XSLT1Parser)
+        self.assertEqual([node_a], nodes)
+
+
+class ValidateSchematronFiles(unittest.TestCase):
+    """
+    Tests the schematron files used in the test cases, validating them against the Schematron schematron from the specification
+    """
+
+    def setUp(self):
+        self.schema = Schema(get_file("schematron", "schematron.sch"))
+
+    def test_correct_schematrons(self):
+        for filename in ['basic.sch',
+                         'schematron.sch',
+                         'unknown_querybinding.sch',
+                         'svrl.sch',
+                         'full.sch'
+                         ]:
+            xml_doc = etree.parse(get_file("schematron", filename))
+            report = self.schema.validate_document(xml_doc)
+            self.assertEqual([], report.get_failed_asserts(), [a.text for a in report.get_failed_asserts()])
 
 
 if __name__ == '__main__':

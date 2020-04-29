@@ -2,7 +2,8 @@
 from pyschematron.exceptions import *
 
 from elementpath import XPath1Parser, XPathContext, select, Selector
-
+from elementpath.xpath_nodes import is_element_node
+from pyschematron.elementpath_extensions.xslt1_parser import XSLT1Parser
 from lxml import etree
 
 def instantiate():
@@ -28,22 +29,21 @@ class XSLTBinding(object):
         :param variables: Variables to be used in the rule context expression
         :return:
         """
-        result = select(xml_document, rule_context, namespaces=namespaces, variables=variables, parser=XPath1Parser)
+        #result = select(xml_document, rule_context, namespaces=namespaces, variables=variables, parser=XPath1Parser)
+        result = select(xml_document, rule_context, namespaces=namespaces, variables=variables, parser=XSLT1Parser)
         if rule_context.startswith('/'):
             return result
         else:
-            selector = Selector(rule_context, namespaces=namespaces, variables=variables)
+            # THIS is the one were we need to use the special context parser
+            selector = Selector(rule_context, namespaces=namespaces, variables=variables, parser=XSLT1Parser)
             for el in xml_document.iter():
-                result.extend(selector.select(el))
+                if is_element_node(el):
+                    result.extend(selector.select(el))
             return result
 
     def check_element_context(self, root_element, element, context, namespaces, variables):
-        print("[XX] checking element context")
-        print("[XX] element: %s" % etree.tostring(element).decode("utf-8"))
-        print("[XX] context to check: " + context)
         #result = element.xpath(context, namespaces=namespaces, _variables=variables)
         result = root_element.xpath(context)
-        print("[XX] result: " + str(result))
         return result
 
     def find_xpath_nodes(self, xml_document, element, context, namespaces, variables):
@@ -54,14 +54,16 @@ class XSLTBinding(object):
         return xml_document.findall(context, namespaces=namespaces, **variables)
 
     def parse_expression(self, xml_document, expression, namespaces, variables):
-        parser = XPath1Parser(namespaces, variables)
+        #parser = XPath1Parser(namespaces, variables)
+        parser = XSLT1Parser(namespaces, variables)
         root_node = parser.parse(expression)
         context = XPathContext(root=xml_document)
         result = root_node.evaluate(context)
         return result
 
     def evaluate_assertion(self, xml_document, context_element, namespaces, parser_variables, assertion):
-        parser = XPath1Parser(namespaces, parser_variables)
+        #parser = XPath1Parser(namespaces, parser_variables)
+        parser = XSLT1Parser(namespaces, parser_variables)
         context = XPathContext(root=xml_document, item=context_element)
         expr = assertion
         # Should we check whether this is boolean?

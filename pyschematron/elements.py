@@ -39,6 +39,7 @@ class Schema(object):
         self.phases = {}
         self.patterns = {}
         # self.diagnostics
+        self.ps = []
 
         # Specification properties (attributes)
         self.id = None
@@ -110,8 +111,10 @@ class Schema(object):
                 elif el_name == 'pattern':
                     pattern = Pattern()
                     pattern.read_from_element(element)
+                    if pattern.id == '':
+                        pattern.id = "#%d" % len(self.patterns)
                     if pattern.id in self.patterns:
-                        raise SchematronError("Duplicate pattern: %s" % pattern.id)
+                        raise SchematronError("Duplicate pattern id: %s" % pattern.id)
                     self.patterns[pattern.id] = pattern
                 elif el_name == 'phase':
                     phase = Phase()
@@ -120,11 +123,15 @@ class Schema(object):
                 elif el_name == 'include':
                     pattern = Pattern()
                     pattern.read_from_file(element.attrib['href'])
+                    if pattern.id == '':
+                        pattern.id = "#%d" % len(self.patterns)
                     if pattern.id in self.patterns:
-                        raise SchematronError("Duplicate pattern: %s" % pattern.id)
+                        raise SchematronError("Duplicate pattern id: %s" % pattern.id)
                     self.patterns[pattern.id] = pattern
+                elif el_name == 'p':
+                    self.ps.append(element.text)
                 else:
-                    raise SchematronError("Unknown element in schematron file: %s" % element.tag)
+                    raise SchematronError("Unknown element in schema: %s" % element.tag)
 
         if process_abstract_patterns:
             self.process_abstract_patterns()
@@ -205,6 +212,8 @@ class Schema(object):
             pattern_context.set_pattern(p)
 
             for r in p.rules:
+                if r.abstract:
+                    continue
                 rule_context = pattern_context.copy()
                 rule_context.set_rule(r)
 
@@ -223,6 +232,7 @@ class Schema(object):
 
                     rule_context.validate_assertions(element, report)
 
+        #print("[XX] " + str(fired_rules))
         return report
 
 class Phase(object):
@@ -258,10 +268,11 @@ class Pattern(object):
         self.params = {}
 
         self.id = None
+        self.title = None
         self.rules = []
 
     def read_from_element(self, p_element):
-        self.id = p_element.attrib.get("id", "pattern")
+        self.id = p_element.attrib.get("id", "")
         if "abstract" in p_element.attrib and p_element.attrib['abstract'] == 'true':
             self.abstract = True
         if "is-a" in p_element.attrib:
@@ -273,7 +284,7 @@ class Pattern(object):
                 continue
             el_name = etree.QName(element.tag).localname
             if el_name == 'rule':
-                rule = Rule()
+                rule = Rule(self)
                 rule.read_from_element(element, self.variables)
                 self.rules.append(rule)
             elif el_name == 'let':
@@ -284,6 +295,8 @@ class Pattern(object):
                 p_name = element.attrib['name']
                 p_value = element.attrib['value']
                 self.params[p_name] = p_value
+            elif el_name == 'title':
+                self.title = element.text
             else:
                 raise SchematronError("Unknown element in pattern: %s: %s" % (self.id, element.tag))
 
@@ -292,12 +305,21 @@ class Pattern(object):
         with WorkingDirectory(os.path.dirname(file_path)):
             self.read_from_element(xml.getroot())
 
+    def get_rule(self, id):
+        for r in self.rules:
+            if r.id == id:
+                return r
+        raise SchematronError("Error: unknown rule with id '%s'" % id)
+
 class Rule(object):
-    def __init__(self):
+    def __init__(self, pattern=None):
         self.context = None
         self.assertions = []
+        self.reports = []
         self.variables = {}
         self.id = None
+        self.abstract = False
+        self.pattern = pattern
 
     def copy(self):
         new_rule = Rule()
@@ -305,11 +327,20 @@ class Rule(object):
         new_rule.id = self.id
         new_rule.assertions = self.assertions[:]
         new_rule.variables = copy.deepcopy(self.variables)
+        new_rule.abstract = self.abstract
+        new_rule.pattern = self.pattern
         return new_rule
 
     def read_from_element(self, r_element, variables):
-        self.context = r_element.attrib['context']
         self.id = r_element.attrib.get('id', "")
+        self.abstract = r_element.attrib.get('abstract', False)
+        if self.abstract:
+            if self.id == '':
+                raise SchematronError("Abstract rules must have a non-empty id attribute")
+            if 'context' in r_element.attrib:
+                raise SchematronError("Abstract rules cannot have a context attribute")
+        else:
+            self.context = r_element.attrib['context']
         for element in r_element:
             cls = element.__class__.__name__
             if cls == "_Comment":
@@ -319,10 +350,22 @@ class Rule(object):
                 assertion = Assertion(rule=self)
                 assertion.read_from_element(element, variables)
                 self.assertions.append(assertion)
+            elif el_name == 'report':
+                    report = Report(rule=self)
+                    report.read_from_element(element, variables)
+                    self.reports.append(report)
             elif el_name == 'let':
                 p_name = element.attrib['name']
                 p_value = element.attrib['value']
                 self.variables[p_name] = p_value
+            elif el_name == 'extends':
+                if 'rule' in element.attrib:
+                    rule_id = element.attrib['rule']
+                    orig_rule = self.pattern.get_rule(rule_id)
+                    for assertion in orig_rule.assertions:
+                        self.assertions.append(assertion)
+
+                # Add all rules from the given element if it
             else:
                 raise SchematronError("Unknown element in rule with context %s: %s" % (self.context, element.tag))
 
@@ -344,4 +387,18 @@ class Assertion(object):
             self.flag = a_element.attrib['flag']
         else:
             self.flag = "error"
+        self.text = a_element.text
+
+class Report(object):
+    def __init__(self, rule=None):
+        self.id = "unset"
+        self.test = None
+        self.flag = None
+        self.text = None
+
+        self.rule = rule
+
+    def read_from_element(self, a_element, variables):
+        self.test = a_element.attrib['test']
+        self.id = a_element.attrib.get('id', '')
         self.text = a_element.text
