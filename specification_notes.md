@@ -10,7 +10,7 @@ The specification that this version is based on can be found at at http://standa
 
 ##### 5.4.1 active element
 
-Not implemented
+Implemented
 
 ##### 5.4.2 assert element
 
@@ -76,7 +76,7 @@ Implemented
 
 ##### 5.4.11 report element
 
-Not implemented
+Implemented
 
 ##### 5.4.12 rule element
 
@@ -133,11 +133,11 @@ Implemented, insofar the elements from section 5.4 have been implemented.
 
 ##### 6.2 Minimal syntax
 
-Partly implemented in the validation, insofar the elements from section 5.4 have been implemented, but cannot be called directly.
+Implemented
 
 ##### 6.3 Abstract pattern processing
 
-Implemented but needs verification of the specification.
+Implemented
 
 
 ##### 6.4 Query language binding

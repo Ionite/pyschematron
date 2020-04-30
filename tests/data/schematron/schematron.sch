@@ -24,9 +24,7 @@
   <sch:title>Schema for Additional Constraints in Schematron</sch:title>
   <sch:ns prefix="sch" uri="http://purl.oclc.org/dsdl/schematron" />
   <sch:p>
-    This schema supplies some constraints in addition to those given in the
-    ISO/IEC 19757-2
-    (RELAX NG Compact Syntax) Schema for Schematron.
+    This schema supplies some constraints in addition to those given in the ISO/IEC 19757-2 (RELAX NG Compact Syntax) Schema for Schematron.
   </sch:p>
   <sch:pattern>
     <sch:rule context="sch:active">
@@ -41,9 +39,7 @@
     </sch:rule>
     <sch:rule context="sch:extends">
       <sch:assert test="//sch:rule[@abstract='true'][@id=current()/@rule]">
-        The rule
-        attribute of an extends element shall match the id
-        attribute of an abstract rule.
+        The rule attribute of an extends element shall match the id attribute of an abstract rule.
       </sch:assert>
     </sch:rule>
     <sch:rule context="sch:let">
