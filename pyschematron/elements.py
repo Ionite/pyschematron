@@ -10,6 +10,7 @@ from pyschematron.exceptions import *
 from pyschematron.util import WorkingDirectory, abstract_replace_vars
 from pyschematron.query_bindings import xslt, xslt2, xpath2
 from pyschematron.validation import ValidationContext, ValidationReport
+from pyschematron import xml_util
 
 QUERY_BINDINGS = {
     'None': xslt,
@@ -49,6 +50,7 @@ class Schema(object):
         self.xml_lang = None
         self.xml_space = None
         self.schemaVersion = None
+        self.query_binding_name = None
         self.query_binding = None
 
         #
@@ -56,22 +58,74 @@ class Schema(object):
         #
         self.file_path = None
         self.verbosity = verbosity
+        self.abstract_patterns_processed = False
 
         if filename is not None:
             self.read_from_file(filename)
 
     def set_query_binding(self, query_binding):
         if query_binding is None:
+            self.query_binding_name = 'xslt'
             self.query_binding = QUERY_BINDINGS['xslt'].instantiate()
         elif query_binding not in QUERY_BINDINGS:
             raise SchematronNotImplementedError(
                 "Query Binding '%s' is not supported by this implementation" % query_binding)
         else:
+            self.query_binding_name = query_binding
             self.query_binding = QUERY_BINDINGS[query_binding].instantiate()
 
     def msg(self, level, msg):
         if self.verbosity >= level:
             print(msg)
+
+    def from_xml(self, root):
+        # Process the attributes
+        self.id = root.attrib.get("id", "")
+        self.see = root.attrib.get("see", "")
+        self.fpi = root.attrib.get("fpi", "")
+        self.xml_lang = root.attrib.get("xml:lang", "")
+        self.xml_space = root.attrib.get("xml:space", "default")
+        self.schemaVersion = root.attrib.get("schemaVersion", "")
+        self.default_phase = root.attrib.get("defaultPhase", "#ALL")
+        self.set_query_binding(root.attrib.get('queryBinding'))
+
+        # Process the elements
+        for element in root:
+            # Ignore comments
+            cls = element.__class__.__name__
+            if cls == "_Comment":
+                continue
+            el_name = etree.QName(element.tag).localname
+            if el_name == 'title':
+                self.title = element.text
+            elif el_name == 'let':
+                self.variables[element.attrib['name']] = element.attrib.get('value', element.text)
+            elif el_name == 'ns':
+                self.ns_prefixes[element.attrib['prefix']] = element.attrib['uri']
+            elif el_name == 'pattern':
+                pattern = Pattern()
+                pattern.from_xml(element)
+                if pattern.id == '':
+                    pattern.id = "#%d" % len(self.patterns)
+                if pattern.id in self.patterns:
+                    raise SchematronError("Duplicate pattern id: %s" % pattern.id)
+                self.patterns[pattern.id] = pattern
+            elif el_name == 'phase':
+                phase = Phase()
+                phase.from_xml(element)
+                self.phases[phase.id] = phase
+            elif el_name == 'include':
+                pattern = Pattern()
+                pattern.read_from_file(element.attrib['href'])
+                if pattern.id == '':
+                    pattern.id = "#%d" % len(self.patterns)
+                if pattern.id in self.patterns:
+                    raise SchematronError("Duplicate pattern id: %s" % pattern.id)
+                self.patterns[pattern.id] = pattern
+            elif el_name == 'p':
+                self.ps.append(element.text)
+            else:
+                raise SchematronError("Unknown element in schema: %s" % element.tag)
 
     def read_from_file(self, file_path, process_abstract_patterns=True):
         """
@@ -85,53 +139,7 @@ class Schema(object):
         xml = etree.parse(file_path)
         with WorkingDirectory(os.path.dirname(file_path)):
             root = xml.getroot()
-            # Process the attributes
-            self.id = root.attrib.get("id", "")
-            self.see = root.attrib.get("see", "")
-            self.fpi = root.attrib.get("fpi", "")
-            self.xml_lang = root.attrib.get("xml:lang", "")
-            self.xml_space = root.attrib.get("xml:space", "default")
-            self.schemaVersion = root.attrib.get("schemaVersion", "")
-            self.default_phase = root.attrib.get("defaultPhase", "#ALL")
-            self.set_query_binding(root.attrib.get('queryBinding'))
-
-            # Process the elements
-            for element in root:
-                # Ignore comments
-                cls = element.__class__.__name__
-                if cls == "_Comment":
-                    continue
-                el_name = etree.QName(element.tag).localname
-                if el_name == 'title':
-                    self.title = element.text
-                elif el_name == 'let':
-                    self.variables[element.attrib['name']] = element.attrib.get('value', element.text)
-                elif el_name == 'ns':
-                    self.ns_prefixes[element.attrib['prefix']] = element.attrib['uri']
-                elif el_name == 'pattern':
-                    pattern = Pattern()
-                    pattern.read_from_element(element)
-                    if pattern.id == '':
-                        pattern.id = "#%d" % len(self.patterns)
-                    if pattern.id in self.patterns:
-                        raise SchematronError("Duplicate pattern id: %s" % pattern.id)
-                    self.patterns[pattern.id] = pattern
-                elif el_name == 'phase':
-                    phase = Phase()
-                    phase.read_from_element(element)
-                    self.phases[phase.id] = phase
-                elif el_name == 'include':
-                    pattern = Pattern()
-                    pattern.read_from_file(element.attrib['href'])
-                    if pattern.id == '':
-                        pattern.id = "#%d" % len(self.patterns)
-                    if pattern.id in self.patterns:
-                        raise SchematronError("Duplicate pattern id: %s" % pattern.id)
-                    self.patterns[pattern.id] = pattern
-                elif el_name == 'p':
-                    self.ps.append(element.text)
-                else:
-                    raise SchematronError("Unknown element in schema: %s" % element.tag)
+            self.from_xml(root)
 
         if process_abstract_patterns:
             self.process_abstract_patterns()
@@ -143,8 +151,15 @@ class Schema(object):
             raise SchematronError("Unknown pattern: %s" % pattern_id)
 
     def process_abstract_patterns(self):
+        """
+        Replaces the relevant data in 'is-a' patterns, and removes all abstract patterns
+        :return:
+        """
+        new_patterns = {}
         for pattern in self.patterns.values():
-            if pattern.isa is not None:
+            if pattern.abstract:
+                continue
+            elif pattern.isa is not None:
                 # print("applying %s to %s" % (pattern.isa, pattern.id))
                 # print("rule count: %d" % len(pattern.rules))
                 abstract = self.get_pattern(pattern.isa)
@@ -157,6 +172,9 @@ class Schema(object):
                     for assertion in rule.assertions:
                         assertion.test = abstract_replace_vars(self.query_binding, assertion.test, pattern.params)
                     pattern.rules.append(rule)
+            new_patterns[pattern.id] = pattern
+        self.patterns = new_patterns
+        self.abstract_patterns_processed = True
 
     def get_patterns_for_phase(self, phase_name):
         if phase_name == "#ALL":
@@ -176,6 +194,30 @@ class Schema(object):
             return self.phases[phase_name]
         else:
             raise SchematronError("Unknown phase: %s" % phase_name)
+
+    def to_minimal_xml_document(self):
+        return etree.ElementTree(self.to_minimal_xml())
+
+    def to_minimal_xml(self, minimal=False):
+        """
+        Creates a minimal syntax schema according to section 6.2 of the specification.
+        TODO: non-minimal output
+        :return: An ElementTree with the current Schema specification in minimal form
+        """
+        if not self.abstract_patterns_processed:
+            self.process_abstract_patterns()
+        root = xml_util.create('schema', add_nsmap=True)
+        xml_util.set_attr(root, 'id', self.id)
+        xml_util.set_attr(root, 'defaultPhase', self.default_phase)
+        xml_util.set_attr(root, 'schemaVersion', self.schemaVersion)
+        xml_util.set_attr(root, 'queryBinding', self.query_binding_name)
+        xml_util.set_variables(root, self.variables)
+
+        for phase in self.phases.values():
+            root.append(phase.to_minimal_xml())
+        for pattern in self.patterns.values():
+            root.append(pattern.to_minimal_xml())
+        return root
 
     def validate_document(self, xml_doc, phase="#DEFAULT"):
         """
@@ -241,7 +283,7 @@ class Phase(object):
         self.active_patterns = []
         self.variables = {}
 
-    def read_from_element(self, phase_element):
+    def from_xml(self, phase_element):
         self.id = phase_element.attrib['id']
         for element in phase_element:
             cls = element.__class__.__name__
@@ -257,6 +299,17 @@ class Phase(object):
             else:
                 raise SchematronError("Unknown element in phase: %s: %s" % (self.id, element.tag))
 
+    def to_minimal_xml(self):
+        element = xml_util.create('phase')
+        xml_util.set_attr(element, 'id', self.id)
+        xml_util.set_variables(element, self.variables)
+
+        for pattern in self.active_patterns:
+            active_element = xml_util.create('active')
+            xml_util.set_attr(active_element, 'pattern', pattern)
+            element.append(active_element)
+
+        return element
 
 class Pattern(object):
     def __init__(self):
@@ -271,7 +324,7 @@ class Pattern(object):
         self.title = None
         self.rules = []
 
-    def read_from_element(self, p_element):
+    def from_xml(self, p_element):
         self.id = p_element.attrib.get("id", "")
         if "abstract" in p_element.attrib and p_element.attrib['abstract'] == 'true':
             self.abstract = True
@@ -285,7 +338,7 @@ class Pattern(object):
             el_name = etree.QName(element.tag).localname
             if el_name == 'rule':
                 rule = Rule(self)
-                rule.read_from_element(element, self.variables)
+                rule.from_xml(element, self.variables)
                 self.rules.append(rule)
             elif el_name == 'let':
                 p_name = element.attrib['name']
@@ -303,7 +356,16 @@ class Pattern(object):
     def read_from_file(self, file_path):
         xml = etree.parse(file_path)
         with WorkingDirectory(os.path.dirname(file_path)):
-            self.read_from_element(xml.getroot())
+            self.from_xml(xml.getroot())
+
+    def to_minimal_xml(self):
+        element = xml_util.create('pattern')
+        xml_util.set_attr(element, 'id',  self.id)
+        xml_util.set_attr(element, 'title', self.title)
+        xml_util.set_variables(element, self.variables)
+        for rule in self.rules:
+            element.append(rule.to_minimal_xml())
+        return element
 
     def get_rule(self, id):
         for r in self.rules:
@@ -331,7 +393,7 @@ class Rule(object):
         new_rule.pattern = self.pattern
         return new_rule
 
-    def read_from_element(self, r_element, variables):
+    def from_xml(self, r_element, variables):
         self.id = r_element.attrib.get('id', "")
         self.abstract = r_element.attrib.get('abstract', False)
         if self.abstract:
@@ -348,7 +410,7 @@ class Rule(object):
             el_name = etree.QName(element.tag).localname
             if el_name == 'assert':
                 assertion = Assertion(rule=self)
-                assertion.read_from_element(element, variables)
+                assertion.from_xml(element, variables)
                 self.assertions.append(assertion)
             elif el_name == 'report':
                     report = Report(rule=self)
@@ -369,6 +431,16 @@ class Rule(object):
             else:
                 raise SchematronError("Unknown element in rule with context %s: %s" % (self.context, element.tag))
 
+    def to_minimal_xml(self):
+        element = xml_util.create('rule')
+        xml_util.set_attr(element, 'id', self.id)
+        xml_util.set_attr(element, 'context', self.context)
+        xml_util.set_variables(element, self.variables)
+        for assertion in self.assertions:
+            element.append(assertion.to_minimal_xml())
+        for report in self.reports:
+            element.append(report.to_minimal_xml())
+        return element
 
 class Assertion(object):
     def __init__(self, rule=None):
@@ -379,7 +451,7 @@ class Assertion(object):
 
         self.rule = rule
 
-    def read_from_element(self, a_element, variables):
+    def from_xml(self, a_element, variables):
         self.test = a_element.attrib['test']
         if 'id' in a_element.attrib:
             self.id = a_element.attrib['id']
@@ -387,7 +459,14 @@ class Assertion(object):
             self.flag = a_element.attrib['flag']
         else:
             self.flag = "error"
-        self.text = a_element.text
+        self.text = str(a_element.text).strip()
+
+    def to_minimal_xml(self):
+        element = xml_util.create('assert')
+        xml_util.set_attr(element, 'test', self.test)
+        xml_util.set_attr(element, 'flag', self.flag)
+        xml_util.set_attr(element, 'text', self.text)
+        return element
 
 class Report(object):
     def __init__(self, rule=None):
@@ -402,3 +481,15 @@ class Report(object):
         self.test = a_element.attrib['test']
         self.id = a_element.attrib.get('id', '')
         self.text = a_element.text
+
+    def to_minimal_xml(self):
+        """
+        This inverts the statement of the report, and returns the result as
+        an <assert> xml element, as per specification section 6.2
+        :return: An <assert> xml Element
+        """
+        element = xml_util.create('assert')
+        xml_util.set_attr(element, 'test', "not(%s)" % self.test)
+        xml_util.set_attr(element, 'flag', self.flag)
+        xml_util.set_attr(element, 'text', self.text)
+        return element

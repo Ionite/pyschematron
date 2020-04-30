@@ -23,11 +23,6 @@
         <active pattern="included" />
     </phase>
 
-    <phase id="phase_with_unknown_pattern">
-        <active pattern="unknown_pattern" />
-    </phase>
-
-
     <!-- Built-in pattern -->
     <pattern xmlns="http://purl.oclc.org/dsdl/schematron" id="builtin">
         <rule context="Document/Data" flag="builtin_role">

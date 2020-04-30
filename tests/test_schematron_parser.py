@@ -268,8 +268,12 @@ class TestFullSchematronSample(unittest.TestCase):
         self.assertEqual(1, len(report.get_failed_asserts_flag("included_existence")))
 
         self.assertRaises(SchematronError, self.schema.validate_document, xml_doc, "unknown_phase")
-        self.assertEqual("phase_with_unknown_pattern", self.schema.get_phase("phase_with_unknown_pattern").id)
-        self.assertRaises(SchematronError, self.schema.validate_document, xml_doc, "phase_with_unknown_pattern")
+
+    def test_phase_with_unknown_pattern(self):
+        schema = Schema(get_file("schematron", "malformed/bad_active_pattern.sch"))
+        xml_doc = etree.parse(get_file("xml", "basic1_error_1.xml"))
+        self.assertEqual("bad_phase", schema.get_phase("bad_phase").id)
+        self.assertRaises(SchematronError, schema.validate_document, xml_doc, "bad_phase")
 
 
 class TestXSLT1Parser(unittest.TestCase):
@@ -300,16 +304,37 @@ class ValidateSchematronFiles(unittest.TestCase):
     def setUp(self):
         self.schema = Schema(get_file("schematron", "schematron.sch"))
 
+    def get_schematron_minimal_xml(self, filename):
+        # These are all schematrons, and schematrons with includes can fail
+        # the schematron validation (for instance if a pattern which is defined in
+        # an included file is referenced in the main file)
+        # Therefore, we don't validate it directly, but convert it to a minimal version
+        # first
+        schema_to_check = Schema(get_file("schematron", filename))
+        return schema_to_check.to_minimal_xml_document()
+
     def test_correct_schematrons(self):
         for filename in ['basic.sch',
                          'schematron.sch',
-                         'unknown_querybinding.sch',
+                         #'unknown_querybinding.sch',
                          'svrl.sch',
                          'full.sch'
                          ]:
-            xml_doc = etree.parse(get_file("schematron", filename))
+            xml_doc = self.get_schematron_minimal_xml(filename)
             report = self.schema.validate_document(xml_doc)
             self.assertEqual([], report.get_failed_asserts(), [a.text for a in report.get_failed_asserts()])
+
+    def test_bad_schematrons(self):
+        for filename in ['malformed/bad_is_a_attribute.sch']:
+            # These wouldn't even pass our own parsing, to read them directly
+            xml_doc = etree.parse(get_file("schematron", filename))
+            report = self.schema.validate_document(xml_doc)
+            self.assertNotEqual([], report.get_failed_asserts(), [a.text for a in report.get_failed_asserts()])
+
+        for filename in ['malformed/bad_active_pattern.sch']:
+            xml_doc = self.get_schematron_minimal_xml(filename)
+            report = self.schema.validate_document(xml_doc)
+            self.assertNotEqual([], report.get_failed_asserts(), [a.text for a in report.get_failed_asserts()])
 
 
 if __name__ == '__main__':
