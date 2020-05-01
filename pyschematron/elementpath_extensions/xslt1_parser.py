@@ -20,8 +20,8 @@ register('current')
 def select(self, context=None):
     if context is None:
         self.missing_context()
-    if context.original_item is not None:
-        return [context.original_item]
+    if context.current_item is not None:
+        return [context.current_item]
     else:
         raise Exception("current() called in a context without an original context item")
 

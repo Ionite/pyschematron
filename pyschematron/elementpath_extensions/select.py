@@ -1,6 +1,7 @@
 from elementpath.xpath_context import XPathContext
 from elementpath.xpath2_parser import XPath2Parser as XPath2Parser
 from elementpath.xpath1_parser import is_document_node
+from pyschematron.elementpath_extensions.context import XPathContextXSLT
 
 def oselect_with_context(document_root, context_item, path, namespaces=None, parser=None, **kwargs):
     """
@@ -39,7 +40,7 @@ def select_with_context(document, context_item, path, namespaces=None, parser=No
         raise Exception("select_with_context document parameter MUST be a full ElementTree")
     parser = (parser or XPath2Parser)(namespaces, **kwargs)
     root_token = parser.parse(path)
-    context = XPathContext(document, item=context_item)
+    context = XPathContextXSLT(document, item=context_item)
     result = root_token.get_results(context)
     return result
 

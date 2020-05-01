@@ -6,6 +6,7 @@ import elementpath
 
 from . import QueryBinding
 from pyschematron.exceptions import *
+from pyschematron.elementpath_extensions.context import XPathContextXSLT
 
 from elementpath import XPath2Parser, XPathContext, select, Selector
 
@@ -30,13 +31,13 @@ class XPath2Binding(QueryBinding):
     def parse_expression(self, xml_document, expression, namespaces, variables):
         parser = XPath2Parser(namespaces, variables)
         root_node = parser.parse(expression)
-        context = XPathContext(root=xml_document)
+        context = XPathContextXSLT(root=xml_document)
         result = root_node.evaluate(context)
         return result
 
     def evaluate_assertion(self, xml_document, context_element, namespaces, parser_variables, assertion):
         parser = XPath2Parser(namespaces, parser_variables)
-        context = XPathContext(root=xml_document, item=context_element)
+        context = XPathContextXSLT(root=xml_document, item=context_element)
         expr = "fn:boolean(%s)" % assertion
         root_token = parser.parse(expr)
         result = root_token.evaluate(context=context)
@@ -50,7 +51,7 @@ class XPath2Binding(QueryBinding):
 
     def evaluate_name_query(self, xml_document, context_element, namespaces, parser_variables, name_query):
         parser = XPath2Parser(namespaces, parser_variables)
-        context = XPathContext(root=xml_document, item=context_element)
+        context = XPathContextXSLT(root=xml_document, item=context_element)
         expr = "fn:node-name(%s)" % name_query
         root_token = parser.parse(expr)
         result = root_token.evaluate(context=context)
@@ -58,7 +59,7 @@ class XPath2Binding(QueryBinding):
 
     def evaluate_value_of_query(self, xml_document, context_element, namespaces, parser_variables, name_query):
         parser = XPath2Parser(namespaces, parser_variables)
-        context = XPathContext(root=xml_document, item=context_element)
+        context = XPathContextXSLT(root=xml_document, item=context_element)
         expr = "fn:string(%s)" % name_query
         root_token = parser.parse(expr)
         result = root_token.evaluate(context=context)

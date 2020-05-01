@@ -4,6 +4,7 @@ from pyschematron.exceptions import *
 from elementpath import XPath1Parser, XPathContext, select, Selector
 from elementpath.xpath_nodes import is_element_node
 from pyschematron.elementpath_extensions.xslt1_parser import XSLT1Parser
+from pyschematron.elementpath_extensions.context import XPathContextXSLT
 from lxml import etree
 
 def instantiate():
@@ -57,14 +58,14 @@ class XSLTBinding(object):
         #parser = XPath1Parser(namespaces, variables)
         parser = XSLT1Parser(namespaces, variables)
         root_node = parser.parse(expression)
-        context = XPathContext(root=xml_document)
+        context = XPathContextXSLT(root=xml_document)
         result = root_node.evaluate(context)
         return result
 
     def evaluate_assertion(self, xml_document, context_element, namespaces, parser_variables, assertion):
         #parser = XPath1Parser(namespaces, parser_variables)
         parser = XSLT1Parser(namespaces, parser_variables)
-        context = XPathContext(root=xml_document, item=context_element)
+        context = XPathContextXSLT(root=xml_document, item=context_element)
         expr = assertion
         # Should we check whether this is boolean?
         root_token = parser.parse(expr)
@@ -80,7 +81,7 @@ class XSLTBinding(object):
 
     def evaluate_name_query(self, xml_document, context_element, namespaces, parser_variables, name_query):
         parser = XPath1Parser(namespaces, parser_variables)
-        context = XPathContext(root=xml_document, item=context_element)
+        context = XPathContextXSLT(root=xml_document, item=context_element)
         expr = name_query
         # Should we check whether this returns a node name?
         root_token = parser.parse(expr)
