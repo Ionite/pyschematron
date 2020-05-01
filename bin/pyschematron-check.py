@@ -29,7 +29,9 @@ def main():
     # other flag are considered errors
     failed_asserts = report.get_failed_asserts_by_flag()
     warnings = failed_asserts.pop('warning', [])
-    errors = failed_asserts.values()
+    errors = []
+    for error_list in failed_asserts.values():
+        errors.extend(error_list)
 
     if args.verbosity > 0:
         for error in errors:
