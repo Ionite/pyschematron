@@ -7,6 +7,7 @@ from decimal import Decimal
 from lxml import etree
 
 from pyschematron.elementpath_extensions.xslt1_parser import XSLT1Parser
+from pyschematron.elementpath_extensions.xslt2_parser import XSLT2Parser
 from pyschematron.elementpath_extensions.select import select_with_context
 from pyschematron.elements import Schema
 from pyschematron.exceptions import *
@@ -276,8 +277,8 @@ class TestFullSchematronSample(unittest.TestCase):
         self.assertRaises(SchematronError, schema.validate_document, xml_doc, "bad_phase")
 
 
-class TestXSLT1Parser(unittest.TestCase):
-    def test_current(self):
+class TestXSLTParsers(unittest.TestCase):
+    def check_current(self, parser_class):
         xml_doc = etree.parse(StringIO("""
         <root>
             <element id="a">value</element>
@@ -286,15 +287,20 @@ class TestXSLT1Parser(unittest.TestCase):
         """))
         expr = "current()"
         for node in xml_doc.iter():
-            nodes = select_with_context(xml_doc, node, expr, parser=XSLT1Parser)
+            nodes = select_with_context(xml_doc, node, expr, parser=parser_class)
             self.assertEqual([node], nodes)
 
         node_a = select(xml_doc, "//element")[0]
         node_b = select(xml_doc, "//element")[1]
         ref_node = select(xml_doc, "//element[@ref]")[0]
-        nodes = select_with_context(xml_doc, ref_node, "/root/element[@id=current()/@ref]", parser=XSLT1Parser)
+        nodes = select_with_context(xml_doc, ref_node, "/root/element[@id=current()/@ref]", parser=parser_class)
         self.assertEqual([node_a], nodes)
 
+    def test_current_xslt1(self):
+        self.check_current(XSLT1Parser)
+
+    def test_current_xslt2(self):
+        self.check_current(XSLT2Parser)
 
 class ValidateSchematronFiles(unittest.TestCase):
     """
