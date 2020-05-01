@@ -26,16 +26,18 @@ This tool takes a schematron file and an xml document, and directly validates th
 
 This is an early beta, and it is not feature-complete yet, nor is the API frozen.
 
-Currently, validation works for a number of schematron files, and XSLT generation is partially complete.
+Currently, validation works for a number of schematron files, but XSLT generation is only partially complete.
 
 Plans for the (near) future
-
-- extend the Report data structure
-  This report structure should contain at least the information needed to create the result in svrl (i.e. the same output the xslt would produce)
+- refactor Assert and Report classes into subclasses of one superclass
+- rename tools
+- cleanup and docstrings
+- extend the Report data structure to output svrl
 - go through the specification, and mark its element and sections as implemented/roadmap/not planned
 - implement the other processing steps as defined in section 6
 - additional documentation
 - add support for output formats of validator (text, svrl, json (format to be defined))
+- diagnostics support
 
 Other things to work on:
 - performance improvement
