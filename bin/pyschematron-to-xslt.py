@@ -12,7 +12,7 @@ from pyschematron.xsl_generator import schema_to_xsl
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('filename', help='the schematron file to process')
-    parser.add_argument('-o', '--output-format', help='output format, one of minimal or xslt (default)')
+    parser.add_argument('-o', '--output-format', default='xslt', help='output format, one of minimal or xslt (default)')
     args = parser.parse_args()
 
 
@@ -22,8 +22,12 @@ def main():
 
     if args.output_format == 'xslt':
         print(schema_to_xsl(schema))
-    else:
+    elif args.output_format == 'minimal':
         print(etree.tostring(schema.to_minimal_xml(minimal=True), pretty_print=True).decode('utf-8'))
+    else:
+        print("Unknown output format: %s" % args.output_format)
+        return 1
+    return 0
 
 if __name__=='__main__':
     sys.exit(main())

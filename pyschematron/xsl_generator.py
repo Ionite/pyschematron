@@ -203,7 +203,7 @@ def schema_to_xsl(schema):
     result.append('      <svrl:ns-prefix-in-attribute-values uri="http://www.w3.org/2001/XMLSchema" prefix="xs"/>')
 
     pattern_mode_id = 10
-    for pattern in schema.patterns:
+    for pattern in schema.patterns.values():
         if not pattern.abstract:
             result.append('      <svrl:active-pattern>')
             result.append('        <xsl:attribute name="document">')
@@ -225,7 +225,7 @@ def schema_to_xsl(schema):
     result.append('  </xsl:template>')
     result.append('  <!--SCHEMATRON PATTERNS-->')
     result.append('  <svrl:text xmlns:svrl="http://purl.oclc.org/dsdl/svrl">%s</svrl:text>' % schema.title)
-    for pattern in schema.patterns:
+    for pattern in schema.patterns.values():
         if not pattern.abstract:
             if pattern.isa:
                 pattern = schema.get_pattern(pattern.isa)

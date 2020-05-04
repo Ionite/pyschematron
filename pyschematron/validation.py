@@ -55,13 +55,13 @@ class ValidationContext(object):
                                                                   variables=self.variables)
 
     def validate_assertions(self, element, report):
-        r = self.rule
-        for a in r.assertions:
-            self.msg(3, "Start assert test: %s" % a.id)
-            self.msg(4, "Test context: %s" % str(r.context))
-            self.msg(4, "Test expression: %s" % a.test)
+        rule = self.rule
+        for assert_test in rule.assertions:
+            self.msg(3, "Start assert test: %s" % assert_test.id)
+            self.msg(4, "Test context: %s" % str(rule.context))
+            self.msg(4, "Test expression: %s" % assert_test.test)
             result = self.schema.query_binding.evaluate_assertion(self.xml_doc, element, self.schema.ns_prefixes, self.variables,
-                                                           a.test)
+                                                           assert_test.test)
             if not result:
                 self.msg(5, "Failed assertion")
                 self.msg(5, "Pattern: %s" % self.pattern.id)
@@ -69,20 +69,20 @@ class ValidationContext(object):
                 for k, v in self.variables.items():
                     self.msg(5, "  %s: %s" % (k, v))
                 self.msg(5, "Context root: %s" % str(self.xml_doc.getroot()))
-                self.msg(5, "Context item: %s" % r.context)
+                self.msg(5, "Context item: %s" % rule.context)
                 self.msg(5, "CONTEXT ELEMENT: " + etree.tostring(element, pretty_print=True).decode('utf-8'))
-                if 'id' in a.__dict__:
-                    self.msg(5, "Id: " + a.id)
-                self.msg(5, "Test: '%s'" % a.test)
+                if 'id' in assert_test.__dict__:
+                    self.msg(5, "Id: " + assert_test.id)
+                self.msg(5, "Test: '%s'" % assert_test.test)
                 self.msg(5, "Result: %s" % str(result))
 
-                report.add_failed_assert(self, a)
-        for r in r.reports:
-            self.msg(3, "Start report test: %s" % r.id)
-            self.msg(4, "Test context: %s" % str(r.context))
-            self.msg(4, "Test expression: %s" % r.test)
+                report.add_failed_assert(self, assert_test)
+        for report_test in rule.reports:
+            self.msg(3, "Start report test: %s" % report_test.id)
+            self.msg(4, "Test context: %s" % str(rule.context))
+            self.msg(4, "Test expression: %s" % report_test.test)
             result = self.schema.query_binding.evaluate_assertion(self.xml_doc, element, self.schema.ns_prefixes, self.variables,
-                                                                  r.test)
+                                                                  report_test.test)
             if result:
                 self.msg(5, "Succesful report")
                 self.msg(5, "Pattern: %s" % self.pattern.id)
@@ -90,14 +90,14 @@ class ValidationContext(object):
                 for k, v in self.variables.items():
                     self.msg(5, "  %s: %s" % (k, v))
                 self.msg(5, "Context root: %s" % str(self.xml_doc.getroot()))
-                self.msg(5, "Context item: %s" % r.context)
+                self.msg(5, "Context item: %s" % rule.context)
                 self.msg(5, "CONTEXT ELEMENT: " + etree.tostring(element, pretty_print=True).decode('utf-8'))
-                if 'id' in r.__dict__:
-                    self.msg(5, "Id: " + r.id)
-                self.msg(5, "Test: '%s'" % r.test)
+                if 'id' in rule.__dict__:
+                    self.msg(5, "Id: " + report_test.id)
+                self.msg(5, "Test: '%s'" % report_test.test)
                 self.msg(5, "Result: %s" % str(result))
 
-                report.add_succesful_report(self, r)
+                report.add_successful_report(self, report_test)
 
 
 class ValidationReport(object):
@@ -108,10 +108,12 @@ class ValidationReport(object):
         self.fired_rules[rule_context] = []
 
     def add_failed_assert(self, rule_context, assertion):
-        self.fired_rules[rule_context].append(assertion)
+        if assertion not in self.fired_rules[rule_context]:
+            self.fired_rules[rule_context].append(assertion)
     
     def add_successful_report(self, rule_context, report):
-        self.fired_rules[rule_context].append(report)
+        if report not in self.fired_rules[rule_context]:
+            self.fired_rules[rule_context].append(report)
 
     def get_failed_asserts(self):
         """

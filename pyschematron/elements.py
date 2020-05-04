@@ -39,6 +39,7 @@ class Schema(object):
         self.variables = {}
         self.phases = {}
         self.patterns = {}
+        self.diagnostics = None
         # self.diagnostics
         self.ps = []
 
@@ -103,7 +104,7 @@ class Schema(object):
             elif el_name == 'ns':
                 self.ns_prefixes[element.attrib['prefix']] = element.attrib['uri']
             elif el_name == 'pattern':
-                pattern = Pattern()
+                pattern = Pattern(self)
                 pattern.from_xml(element)
                 if pattern.id == '':
                     pattern.id = "#%d" % len(self.patterns)
@@ -115,7 +116,7 @@ class Schema(object):
                 phase.from_xml(element)
                 self.phases[phase.id] = phase
             elif el_name == 'include':
-                pattern = Pattern()
+                pattern = Pattern(self)
                 pattern.read_from_file(element.attrib['href'])
                 if pattern.id == '':
                     pattern.id = "#%d" % len(self.patterns)
@@ -124,6 +125,11 @@ class Schema(object):
                 self.patterns[pattern.id] = pattern
             elif el_name == 'p':
                 self.ps.append(element.text)
+            elif el_name == 'diagnostics':
+                if self.diagnostics is not None:
+                    raise SchematronError("diagnostics element can only occur once per schema or pattern")
+                self.diagnostics = Diagnostics()
+                self.diagnostics.from_xml(element)
             else:
                 raise SchematronError("Unknown element in schema: %s" % element.tag)
 
@@ -245,6 +251,7 @@ class Schema(object):
             schema_context.add_variables(self.phases[phase].variables)
 
         for p in patterns:
+            self.msg(5, "Validating pattern: " + str(p.id))
             # We track the fired rule for each element, since every document node should only have one rule
             fired_rules = {}
             # Variables themselves can be expressions,
@@ -254,6 +261,7 @@ class Schema(object):
             pattern_context.set_pattern(p)
 
             for r in p.rules:
+                self.msg(5, "Validating rule with context: " + str(r.context))
                 if r.abstract:
                     continue
                 rule_context = pattern_context.copy()
@@ -263,6 +271,7 @@ class Schema(object):
 
                 # If the context is the literal '/', pass 'None' as the context item to elementpath
                 elements = rule_context.get_rule_context_elements()
+                self.msg(5, "Number of matching elements: %s" % len(elements))
 
                 for element in elements:
                     if element in fired_rules:
@@ -312,7 +321,8 @@ class Phase(object):
         return element
 
 class Pattern(object):
-    def __init__(self):
+    def __init__(self, schema):
+        self.schema = schema
         self.abstract = False
         self.isa = None
 
@@ -414,7 +424,7 @@ class Rule(object):
                 self.assertions.append(assertion)
             elif el_name == 'report':
                     report = Report(rule=self)
-                    report.read_from_element(element, variables)
+                    report.from_xml(element, variables)
                     self.reports.append(report)
             elif el_name == 'let':
                 p_name = element.attrib['name']
@@ -442,12 +452,16 @@ class Rule(object):
             element.append(report.to_minimal_xml())
         return element
 
-class Assertion(object):
-    def __init__(self, rule=None):
+class RuleTest(object):
+    """
+    Base class for the tests that are part of rules. Each test can be an Assertion or a Report.
+    """
+    def __init__(self, rule):
         self.id = "unset"
         self.test = None
         self.flag = None
         self.text = None
+        self.diagnostic_ids = []
 
         self.rule = rule
 
@@ -455,11 +469,9 @@ class Assertion(object):
         self.test = a_element.attrib['test']
         if 'id' in a_element.attrib:
             self.id = a_element.attrib['id']
-        if 'flag' in a_element.attrib:
-            self.flag = a_element.attrib['flag']
-        else:
-            self.flag = "error"
         self.text = str(a_element.text).strip()
+        if 'diagnostics' in a_element.attrib:
+            self.diagnostic_ids = a_element.attrib['diagnostics'].split("\s")
 
     def to_minimal_xml(self):
         element = xml_util.create('assert')
@@ -468,20 +480,20 @@ class Assertion(object):
         xml_util.set_attr(element, 'text', self.text)
         return element
 
-class Report(object):
-    def __init__(self, rule=None):
-        self.id = "unset"
-        self.test = None
-        self.flag = None
-        self.text = None
+    def get_diagnostic_text(self, diagnostic_id):
+        if diagnostic_id in self.rule.pattern.schema.diagnostics:
+            return self.rule.pattern.schema.diagnostics[diagnostic_id].text
 
-        self.rule = rule
+class Assertion(RuleTest):
+    # Assert statements can have a flag attribute
+    def from_xml(self, a_element, variables):
+        super().from_xml(a_element)
+        if 'flag' in a_element.attrib:
+            self.flag = a_element.attrib['flag']
+        else:
+            self.flag = "error"
 
-    def read_from_element(self, a_element, variables):
-        self.test = a_element.attrib['test']
-        self.id = a_element.attrib.get('id', '')
-        self.text = a_element.text
-
+class Report(RuleTest):
     def to_minimal_xml(self):
         """
         This inverts the statement of the report, and returns the result as
@@ -493,3 +505,38 @@ class Report(object):
         xml_util.set_attr(element, 'flag', self.flag)
         xml_util.set_attr(element, 'text', self.text)
         return element
+
+
+class Diagnostics(object):
+    def __init__(self):
+        self.diagnostics = {}
+
+    def from_xml(self, d_element):
+        for element in d_element:
+            cls = element.__class__.__name__
+            if cls == "_Comment":
+                continue
+            el_name = etree.QName(element.tag).localname
+            if el_name == 'diagnostic':
+                diagnostic = Diagnostic()
+                diagnostic.from_xml(element)
+                self.diagnostics[diagnostic.id] = diagnostic
+            else:
+                raise SchematronError("Unknown element in diagnostics element: %s" % (element.tag))
+
+    def __iter__(self):
+        return self.diagnostics.__iter__()
+
+    def __getitem__(self, key):
+        return self.diagnostics[key]
+
+class Diagnostic(object):
+    def __init__(self):
+        self.id = None
+        self.language = None
+        self.text = None
+
+    def from_xml(self, element):
+        self.id = element.attrib['id']
+        self.language = element.attrib.get('xml:lang')
+        self.text = element.text

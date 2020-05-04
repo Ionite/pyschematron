@@ -342,6 +342,16 @@ class ValidateSchematronFiles(unittest.TestCase):
             report = self.schema.validate_document(xml_doc)
             self.assertNotEqual([], report.get_failed_asserts(), [a.text for a in report.get_failed_asserts()])
 
+class TestDiagnostics(unittest.TestCase):
+    def test_simple_diagnostics(self):
+        schema = Schema(get_file("schematron", "diagnostics.sch"))
+        xml_doc = etree.parse(get_file("xml", "diagnostics/more_than_three_animals.xml"))
+        report = schema.validate_document(xml_doc)
+
+        self.assertEqual(1, len(report.get_failed_asserts()))
+        self.assertEqual(1, len(report.get_failed_asserts()[0].diagnostic_ids))
+        self.assertEqual("""Noah, you must remove as many animals from the ark so that
+      only two of one species live in this accommodation.""".strip(), report.get_failed_asserts()[0].get_diagnostic_text(report.get_failed_asserts()[0].diagnostic_ids[0]).strip())
 
 if __name__ == '__main__':
     unittest.main()

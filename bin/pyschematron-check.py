@@ -36,8 +36,14 @@ def main():
     if args.verbosity > 0:
         for error in errors:
             print("Error: %s" % error.text)
+            for d_id in error.diagnostic_ids:
+                if d_id in error.rule.pattern.schema.diagnostics:
+                    print("Proposal for solution: %s" % error.rule.pattern.schema.diagnostics[d_id].text)
         for warning in warnings:
             print("Warning: %s" % warning.text)
+            for d_id in error.diagnostic_ids:
+                if d_id in error.rule.pattern.schema.diagnostics:
+                    print("Proposal for solution: %s" % error.rule.pattern.schema.diagnostics[d_id].text)
 
     if args.verbosity > 0:
         print("File: %s" % args.xml_file)
