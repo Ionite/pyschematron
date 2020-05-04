@@ -71,7 +71,7 @@ class ValidationContext(object):
                 self.msg(5, "Context root: %s" % str(self.xml_doc.getroot()))
                 self.msg(5, "Context item: %s" % rule.context)
                 self.msg(5, "CONTEXT ELEMENT: " + etree.tostring(element, pretty_print=True).decode('utf-8'))
-                if 'id' in assert_test.__dict__:
+                if assert_test.id:
                     self.msg(5, "Id: " + assert_test.id)
                 self.msg(5, "Test: '%s'" % assert_test.test)
                 self.msg(5, "Result: %s" % str(result))
@@ -92,7 +92,7 @@ class ValidationContext(object):
                 self.msg(5, "Context root: %s" % str(self.xml_doc.getroot()))
                 self.msg(5, "Context item: %s" % rule.context)
                 self.msg(5, "CONTEXT ELEMENT: " + etree.tostring(element, pretty_print=True).decode('utf-8'))
-                if 'id' in rule.__dict__:
+                if report_test.id:
                     self.msg(5, "Id: " + report_test.id)
                 self.msg(5, "Test: '%s'" % report_test.test)
                 self.msg(5, "Result: %s" % str(result))

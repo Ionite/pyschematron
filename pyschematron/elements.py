@@ -3,6 +3,7 @@ This module contains the schematron elements, as defined in the schematron defin
 """
 import copy
 import os
+import re
 
 from lxml import etree
 
@@ -18,7 +19,6 @@ QUERY_BINDINGS = {
     'xslt2': xslt2,
     'xpath2': xpath2
 }
-
 
 class Schema(object):
     def __init__(self, filename=None, verbosity=0):
@@ -91,6 +91,7 @@ class Schema(object):
         self.set_query_binding(root.attrib.get('queryBinding'))
 
         # Process the elements
+        count = 1
         for element in root:
             # Ignore comments
             cls = element.__class__.__name__
@@ -117,6 +118,7 @@ class Schema(object):
                 self.phases[phase.id] = phase
             elif el_name == 'include':
                 pattern = Pattern(self)
+                pattern.count = count
                 pattern.read_from_file(element.attrib['href'])
                 if pattern.id == '':
                     pattern.id = "#%d" % len(self.patterns)
@@ -132,6 +134,7 @@ class Schema(object):
                 self.diagnostics.from_xml(element)
             else:
                 raise SchematronError("Unknown element in schema: %s" % element.tag)
+            count += 1
 
     def read_from_file(self, file_path, process_abstract_patterns=True):
         """
@@ -161,6 +164,7 @@ class Schema(object):
         Replaces the relevant data in 'is-a' patterns, and removes all abstract patterns
         :return:
         """
+        import sys
         new_patterns = {}
         for pattern in self.patterns.values():
             if pattern.abstract:
@@ -457,7 +461,7 @@ class RuleTest(object):
     Base class for the tests that are part of rules. Each test can be an Assertion or a Report.
     """
     def __init__(self, rule):
-        self.id = "unset"
+        self.id = None
         self.test = None
         self.flag = None
         self.text = None
@@ -469,9 +473,10 @@ class RuleTest(object):
         self.test = a_element.attrib['test']
         if 'id' in a_element.attrib:
             self.id = a_element.attrib['id']
-        self.text = str(a_element.text).strip()
+        if a_element.text is not None:
+            self.text = a_element.text.strip()
         if 'diagnostics' in a_element.attrib:
-            self.diagnostic_ids = a_element.attrib['diagnostics'].split("\s")
+            self.diagnostic_ids = re.split("\s+", a_element.attrib['diagnostics'])
 
     def to_minimal_xml(self):
         element = xml_util.create('assert')
@@ -480,6 +485,10 @@ class RuleTest(object):
         xml_util.set_attr(element, 'text', self.text)
         return element
 
+    def get_diagnostic(self, diagnostic_id):
+        if diagnostic_id in self.rule.pattern.schema.diagnostics:
+            return self.rule.pattern.schema.diagnostics[diagnostic_id]
+
     def get_diagnostic_text(self, diagnostic_id):
         if diagnostic_id in self.rule.pattern.schema.diagnostics:
             return self.rule.pattern.schema.diagnostics[diagnostic_id].text
@@ -487,7 +496,7 @@ class RuleTest(object):
 class Assertion(RuleTest):
     # Assert statements can have a flag attribute
     def from_xml(self, a_element, variables):
-        super().from_xml(a_element)
+        super().from_xml(a_element, variables)
         if 'flag' in a_element.attrib:
             self.flag = a_element.attrib['flag']
         else:
@@ -537,6 +546,8 @@ class Diagnostic(object):
         self.text = None
 
     def from_xml(self, element):
+        import sys
+        sys.stderr.write("[XX] element: %s\n" % str(element.attrib))
         self.id = element.attrib['id']
-        self.language = element.attrib.get('xml:lang')
+        self.language = element.attrib.get('{http://www.w3.org/XML/1998/namespace}lang')
         self.text = element.text

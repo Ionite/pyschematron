@@ -8,10 +8,11 @@ import sys
 from lxml import etree
 from pyschematron.elements import Schema
 from pyschematron.xsl_generator import schema_to_xsl
+from pyschematron.xsl_generator2 import schema_to_xsl2
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('filename', help='the schematron file to process')
+    parser.add_argument('filename', help='the schematron file to procewss')
     parser.add_argument('-o', '--output-format', default='xslt', help='output format, one of minimal or xslt (default)')
     args = parser.parse_args()
 
@@ -21,7 +22,12 @@ def main():
     schema.process_abstract_patterns()
 
     if args.output_format == 'xslt':
-        print(schema_to_xsl(schema))
+        xsl_root = schema_to_xsl2(schema)
+        # Normalization: put all namespaces at the top level
+        full_nsmap = xsl_root.nsmap
+        #print(schema_to_xsl(schema))
+
+        print(etree.tostring(xsl_root, pretty_print=True, xml_declaration=True, encoding='utf-8').decode('utf-8'))
     elif args.output_format == 'minimal':
         print(etree.tostring(schema.to_minimal_xml(minimal=True), pretty_print=True).decode('utf-8'))
     else:

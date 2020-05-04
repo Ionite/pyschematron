@@ -3,6 +3,7 @@
   <ns uri="http://www.schematron.info/arche" prefix="ark"/>
   <pattern>
     <rule context="ark:animal">
+      <assert test="count(parent::*/ark:animal[ark:species=current()/ark:species]) &gt; 1">There must be at least two animals of this species</assert>
       <report test="count(parent::*/ark:animal[ark:species=current()/ark:species]) &gt; 2" diagnostics="number">There are more than two animals of this species in this accommodation.</report>
     </rule>
   </pattern>
