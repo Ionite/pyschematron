@@ -63,10 +63,11 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
     check_comments_and_pi = False
     for pattern in patterns:
         for rule in pattern.rules:
-            if '@' in rule.context:
-                check_attributes = True
-            if '(' in rule.context:
-                check_comments_and_pi = True
+            if not rule.abstract:
+                if '@' in rule.context:
+                    check_attributes = True
+                if '(' in rule.context:
+                    check_comments_and_pi = True
     if check_attributes:
         apply_templates_select = "@*|"
     else:
@@ -125,7 +126,8 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
         schematron_output.append(E('svrl', 'ns-prefix-in-attribute-values', {'uri': namespace, 'prefix': prefix}))
     if schema.query_binding_name == 'xslt2':
         schematron_output.append(E('svrl', 'ns-prefix-in-attribute-values', {'uri': 'http://www.w3.org/2001/XMLSchema', 'prefix': 'xs'}))
-    mode_count = 1
+
+    mode_count = schema.element_number_of_first_pattern
     for pattern in patterns:
         pattern_element = E('svrl', 'active-pattern')
         pattern_element.append(E('xsl', 'attribute', {'name': 'document'}, child=E('xsl', 'value-of', {'select': 'document-uri(/)'})))
@@ -147,14 +149,42 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
         for name, value in phase.variables.items():
             root.append(E('xsl', 'variable', {'name': name, 'select': value}))
 
-    mode_count = 1
+    mode_count = schema.element_number_of_first_pattern
     for pattern in patterns:
         root.append(C('PATTERN %s' % pattern.id))
         priority = 999 + len(pattern.rules)
         for rule in pattern.rules:
+            if rule.abstract:
+                continue
             root.append(C('RULE %s' % rule.id))
             rule_element = E('xsl', 'template', {'match': rule.context, 'priority': '%d' % priority, 'mode': 'M%d' % mode_count})
             rule_element.append(E('svrl', 'fired-rule', {'context': rule.context}))
+            for name, value in rule.variables.items():
+                rule_element.append(E('xsl', 'variable', {'name': name, 'select': value}))
+
+            for report in rule.reports:
+                rule_element.append(C('REPORT %s' % (report.id or "")))
+                if_element = E('xsl', 'if', {'test': report.test})
+                successful_report = E('svrl', 'successful-report', {'test': report.test.strip()})
+                if report.id is not None:
+                    successful_report.append(E('xsl', 'attribute', {'name': 'id'}, text=report.id))
+                if report.flag and report.flag != 'error':
+                    successful_report.append(E('xsl', 'attribute', {'name': 'flag'}, text=report.flag))
+                successful_report.append(E('xsl', 'attribute', {'name': 'location'}, child=E('xsl', 'apply-templates', {'select': '.', 'mode': 'schematron-select-full-path'})))
+                successful_report.append(E('svrl', 'text', text=(report.text or "")))
+                for diagnostic_id in report.diagnostic_ids:
+                    diagnostic = report.get_diagnostic(diagnostic_id)
+                    diagnostic_reference = E('svrl', 'diagnostic-reference', {'diagnostic': diagnostic_id})
+                    if diagnostic.language is not None:
+                        diagnostic_attr = E('xsl', 'attribute', {'name': 'xml:lang'}, text=diagnostic.language)
+                        diagnostic_attr.tail = diagnostic.text
+                        diagnostic_reference.append(diagnostic_attr)
+                    else:
+                        diagnostic_reference.text = diagnostic.text
+
+                if_element.append(successful_report)
+                rule_element.append(if_element)
+
             for assertion in rule.assertions:
                 rule_element.append(C('ASSERT %s' % (assertion.id or "")))
                 choose = E('xsl', 'choose')
@@ -181,29 +211,6 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
                 otherwise.append(failed_assert)
                 choose.append(otherwise)
                 rule_element.append(choose)
-
-            for report in rule.reports:
-                rule_element.append(C('REPORT %s' % (report.id or "")))
-                if_element = E('xsl', 'if', {'test': report.test})
-                successful_report = E('svrl', 'successful-report', {'test': report.test.strip()})
-                if report.id is not None:
-                    successful_report.append(E('xsl', 'attribute', {'name': 'id'}, text=report.id))
-                if report.flag and report.flag != 'error':
-                    successful_report.append(E('xsl', 'attribute', {'name': 'flag'}, text=report.flag))
-                successful_report.append(E('xsl', 'attribute', {'name': 'location'}, child=E('xsl', 'apply-templates', {'select': '.', 'mode': 'schematron-select-full-path'})))
-                successful_report.append(E('svrl', 'text', text=(report.text or "")))
-                for diagnostic_id in report.diagnostic_ids:
-                    diagnostic = report.get_diagnostic(diagnostic_id)
-                    diagnostic_reference = E('svrl', 'diagnostic-reference', {'diagnostic': diagnostic_id})
-                    if diagnostic.language is not None:
-                        diagnostic_attr = E('xsl', 'attribute', {'name': 'xml:lang'}, text=diagnostic.language)
-                        diagnostic_attr.tail = diagnostic.text
-                        diagnostic_reference.append(diagnostic_attr)
-                    else:
-                        diagnostic_reference.text = diagnostic.text
-
-                if_element.append(successful_report)
-                rule_element.append(if_element)
 
             # depends on qbinding maybe?
             #rule_element.append(E('xsl', 'apply-templates', {'select': '*|comment()|processing-instruction()', 'mode': "M%d" % mode_count}))

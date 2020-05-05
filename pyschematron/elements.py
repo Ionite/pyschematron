@@ -60,6 +60,10 @@ class Schema(object):
         self.file_path = None
         self.verbosity = verbosity
         self.abstract_patterns_processed = False
+        self.abstract_rules_processed = False
+
+        self.elements_read = 0
+        self.element_number_of_first_pattern = None
 
         if filename is not None:
             self.read_from_file(filename)
@@ -79,6 +83,46 @@ class Schema(object):
         if self.verbosity >= level:
             print(msg)
 
+    def _parse_xml_child(self, element):
+        el_name = etree.QName(element.tag).localname
+        if el_name == 'title':
+            self.title = element.text
+        elif el_name == 'let':
+            self.variables[element.attrib['name']] = element.attrib.get('value', element.text)
+        elif el_name == 'ns':
+            self.ns_prefixes[element.attrib['prefix']] = element.attrib['uri']
+        elif el_name == 'pattern':
+            # Keep track of where we found the first pattern, so we can generate mode identifiers
+            # in the same way as the skeleton implementation does
+            if self.element_number_of_first_pattern is None:
+                self.element_number_of_first_pattern = self.elements_read
+            pattern = Pattern(self)
+            pattern.from_xml(element)
+            if pattern.id == '':
+                pattern.id = "#%d" % len(self.patterns)
+            if pattern.id in self.patterns:
+                raise SchematronError("Duplicate pattern id: %s" % pattern.id)
+            self.patterns[pattern.id] = pattern
+        elif el_name == 'phase':
+            phase = Phase()
+            phase.from_xml(element)
+            self.phases[phase.id] = phase
+        elif el_name == 'include':
+            href = element.attrib['href']
+            with WorkingDirectory(os.path.dirname(os.path.abspath(href))):
+                included_doc = etree.parse(href)
+                self._parse_xml_child(included_doc.getroot())
+        elif el_name == 'p':
+            self.ps.append(element.text)
+        elif el_name == 'diagnostics':
+            if self.diagnostics is not None:
+                raise SchematronError("diagnostics element can only occur once per schema or pattern")
+            self.diagnostics = Diagnostics()
+            self.diagnostics.from_xml(element)
+        else:
+            raise SchematronError("Unknown element in schema: %s" % element.tag)
+        self.elements_read += 1
+
     def from_xml(self, root):
         # Process the attributes
         self.id = root.attrib.get("id", "")
@@ -91,52 +135,14 @@ class Schema(object):
         self.set_query_binding(root.attrib.get('queryBinding'))
 
         # Process the elements
-        count = 1
         for element in root:
             # Ignore comments
             cls = element.__class__.__name__
             if cls == "_Comment":
                 continue
-            el_name = etree.QName(element.tag).localname
-            if el_name == 'title':
-                self.title = element.text
-            elif el_name == 'let':
-                self.variables[element.attrib['name']] = element.attrib.get('value', element.text)
-            elif el_name == 'ns':
-                self.ns_prefixes[element.attrib['prefix']] = element.attrib['uri']
-            elif el_name == 'pattern':
-                pattern = Pattern(self)
-                pattern.from_xml(element)
-                if pattern.id == '':
-                    pattern.id = "#%d" % len(self.patterns)
-                if pattern.id in self.patterns:
-                    raise SchematronError("Duplicate pattern id: %s" % pattern.id)
-                self.patterns[pattern.id] = pattern
-            elif el_name == 'phase':
-                phase = Phase()
-                phase.from_xml(element)
-                self.phases[phase.id] = phase
-            elif el_name == 'include':
-                pattern = Pattern(self)
-                pattern.count = count
-                pattern.read_from_file(element.attrib['href'])
-                if pattern.id == '':
-                    pattern.id = "#%d" % len(self.patterns)
-                if pattern.id in self.patterns:
-                    raise SchematronError("Duplicate pattern id: %s" % pattern.id)
-                self.patterns[pattern.id] = pattern
-            elif el_name == 'p':
-                self.ps.append(element.text)
-            elif el_name == 'diagnostics':
-                if self.diagnostics is not None:
-                    raise SchematronError("diagnostics element can only occur once per schema or pattern")
-                self.diagnostics = Diagnostics()
-                self.diagnostics.from_xml(element)
-            else:
-                raise SchematronError("Unknown element in schema: %s" % element.tag)
-            count += 1
+            self._parse_xml_child(element)
 
-    def read_from_file(self, file_path, process_abstract_patterns=True):
+    def read_from_file(self, file_path, process_abstract_patterns=True, process_abstract_rules=True):
         """
         Fully parses the given schematron file.
 
@@ -152,12 +158,31 @@ class Schema(object):
 
         if process_abstract_patterns:
             self.process_abstract_patterns()
+        if process_abstract_rules:
+            self.process_abstract_rules()
 
     def get_pattern(self, pattern_id):
         if pattern_id in self.patterns:
             return self.patterns[pattern_id]
         else:
             raise SchematronError("Unknown pattern: %s" % pattern_id)
+
+    def process_abstract_rules(self):
+        import sys
+        for pattern in self.patterns.values():
+            new_rules = []
+            for rule in pattern.rules:
+                if rule.extends is not None:
+                    orig_rule = pattern.get_rule(rule.extends)
+                    for assertion in orig_rule.assertions:
+                        rule.assertions.append(assertion)
+                    for report in orig_rule.reports:
+                        rule.reports.append(report)
+                    rule.extends = None
+                if not rule.abstract:
+                    new_rules.append(rule)
+            #pattern.rules = new_rules
+        self.abstract_rules_processed = True
 
     def process_abstract_patterns(self):
         """
@@ -180,6 +205,8 @@ class Schema(object):
                     rule.context = abstract_replace_vars(self.query_binding, rule.context, pattern.params)
                     for assertion in rule.assertions:
                         assertion.test = abstract_replace_vars(self.query_binding, assertion.test, pattern.params)
+                    for report in rule.reports:
+                        report.test = abstract_replace_vars(self.query_binding, report.test, pattern.params)
                     pattern.rules.append(rule)
             new_patterns[pattern.id] = pattern
         self.patterns = new_patterns
@@ -395,12 +422,14 @@ class Rule(object):
         self.id = None
         self.abstract = False
         self.pattern = pattern
+        self.extends = None
 
     def copy(self):
         new_rule = Rule()
         new_rule.context = self.context
         new_rule.id = self.id
         new_rule.assertions = self.assertions[:]
+        new_rule.reports = self.reports[:]
         new_rule.variables = copy.deepcopy(self.variables)
         new_rule.abstract = self.abstract
         new_rule.pattern = self.pattern
@@ -434,11 +463,12 @@ class Rule(object):
                 p_value = element.attrib['value']
                 self.variables[p_name] = p_value
             elif el_name == 'extends':
-                if 'rule' in element.attrib:
-                    rule_id = element.attrib['rule']
-                    orig_rule = self.pattern.get_rule(rule_id)
-                    for assertion in orig_rule.assertions:
-                        self.assertions.append(assertion)
+                self.extends = element.attrib['rule']
+                #if 'rule' in element.attrib:
+                #    rule_id = element.attrib['rule']
+                #    orig_rule = self.pattern.get_rule(rule_id)
+                #    for assertion in orig_rule.assertions:
+                #        self.assertions.append(assertion)
 
                 # Add all rules from the given element if it
             else:

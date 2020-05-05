@@ -353,5 +353,12 @@ class TestDiagnostics(unittest.TestCase):
         self.assertEqual("""Noah, you must remove as many animals from the ark so that
       only two of one species live in this accommodation.""".strip(), report.get_failed_asserts()[0].get_diagnostic_text(report.get_failed_asserts()[0].diagnostic_ids[0]).strip())
 
+class TestAllElements(unittest.TestCase):
+    def setUp(self):
+        self.schema = Schema(get_file("schematron", "all_elements.sch"))
+
+    def test_setup(self):
+        pass
+
 if __name__ == '__main__':
     unittest.main()

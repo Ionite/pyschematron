@@ -30,7 +30,7 @@ Not implemented:
 
 ##### 5.4.3 extends element
 
-Not implemented
+Implemented
 
 ##### 5.4.4 include element
 
@@ -85,6 +85,7 @@ Partly implemented
 implemented:
 - context
 - flags: warning, error, no flag (interpreted as error)
+- abstract rules
 
 Not implemented:
 - icon
@@ -92,7 +93,6 @@ Not implemented:
 - fpi
 - role
 - subject
-- abstract rules
 - rule validation (i.e. whether the rule specification itself is valid)
 
 ##### 5.4.13 schema element
