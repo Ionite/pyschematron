@@ -29,8 +29,7 @@ This is an early beta, and it is not feature-complete yet, nor is the API frozen
 Currently, validation works for a number of schematron files, but XSLT generation is only partially complete.
 
 Plans for the (near) future
-- generalize handling of <include>
-- add support for rule extends
+- add support for nested elements in texts
 - rename tools
 - cleanup and docstrings
 - extend the Report data structure to output svrl
