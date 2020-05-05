@@ -19,9 +19,9 @@ Partly implemented
 Implemented:
 - test
 - flag
+- diagnostics
 
 Not implemented:
-- diagnostics
 - icon
 - see
 - fpi
@@ -84,7 +84,7 @@ Partly implemented
 
 implemented:
 - context
-- flag: warning, error, no flag (interpreted as error)
+- flags: warning, error, no flag (interpreted as error)
 
 Not implemented:
 - icon
@@ -147,3 +147,7 @@ Implemented for xslt, xpath2 and xslt2.
 ##### 6.5 Order and side-effects
 
 Main rule order (match first, skip rest) has been implemented
+
+##### Other
+
+nested elements in texts (such as value-of and emph) are currently not supported. It is likely that only the text up to such elements is shown.

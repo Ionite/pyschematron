@@ -7,8 +7,7 @@ import argparse
 import sys
 from lxml import etree
 from pyschematron.elements import Schema
-from pyschematron.xsl_generator import schema_to_xsl
-from pyschematron.xsl_generator2 import schema_to_xsl2
+from pyschematron.xml.xsl_generator import schema_to_xsl
 
 def main():
     parser = argparse.ArgumentParser()
@@ -22,7 +21,7 @@ def main():
     schema.process_abstract_patterns()
 
     if args.output_format == 'xslt':
-        xsl_root = schema_to_xsl2(schema)
+        xsl_root = schema_to_xsl(schema)
         # Normalization: put all namespaces at the top level
         full_nsmap = xsl_root.nsmap
         #print(schema_to_xsl(schema))

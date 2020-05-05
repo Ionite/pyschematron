@@ -11,7 +11,7 @@ from pyschematron.exceptions import *
 from pyschematron.util import WorkingDirectory, abstract_replace_vars
 from pyschematron.query_bindings import xslt, xslt2, xpath2
 from pyschematron.validation import ValidationContext, ValidationReport
-from pyschematron import xml_util
+from pyschematron.xml import xml_util
 
 QUERY_BINDINGS = {
     'None': xslt,
@@ -164,7 +164,6 @@ class Schema(object):
         Replaces the relevant data in 'is-a' patterns, and removes all abstract patterns
         :return:
         """
-        import sys
         new_patterns = {}
         for pattern in self.patterns.values():
             if pattern.abstract:
@@ -374,7 +373,7 @@ class Pattern(object):
 
     def to_minimal_xml(self):
         element = xml_util.create('pattern')
-        xml_util.set_attr(element, 'id',  self.id)
+        xml_util.set_attr(element, 'id', self.id)
         xml_util.set_attr(element, 'title', self.title)
         xml_util.set_variables(element, self.variables)
         for rule in self.rules:
@@ -546,8 +545,6 @@ class Diagnostic(object):
         self.text = None
 
     def from_xml(self, element):
-        import sys
-        sys.stderr.write("[XX] element: %s\n" % str(element.attrib))
         self.id = element.attrib['id']
         self.language = element.attrib.get('{http://www.w3.org/XML/1998/namespace}lang')
         self.text = element.text

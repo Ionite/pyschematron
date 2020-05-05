@@ -29,7 +29,8 @@ This is an early beta, and it is not feature-complete yet, nor is the API frozen
 Currently, validation works for a number of schematron files, but XSLT generation is only partially complete.
 
 Plans for the (near) future
-- refactor Assert and Report classes into subclasses of one superclass
+- generalize handling of <include>
+- add support for rule extends
 - rename tools
 - cleanup and docstrings
 - extend the Report data structure to output svrl
@@ -37,11 +38,8 @@ Plans for the (near) future
 - implement the other processing steps as defined in section 6
 - additional documentation
 - add support for output formats of validator (text, svrl, json (format to be defined))
-- diagnostics support
 
 Other things to work on:
 - performance improvement
 - XSD schema validation of input files (both schematron itself and optional xsd schemas for input xml documents) 
 - more output format options
-- Do we need a stand-alone xslt(2) transformer too?
-- Would a code generator make sense?

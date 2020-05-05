@@ -1,7 +1,5 @@
 from lxml import etree
-from pyschematron import xml_util
-from pyschematron.exceptions import *
-from pyschematron.xsl_predefined_elements import get_predefined_elements_xslt1, get_predefined_elements_xslt2
+from pyschematron.xml.xsl_predefined_elements import get_predefined_elements_xslt1, get_predefined_elements_xslt2
 
 import copy
 
@@ -47,7 +45,7 @@ def create_xsl_variable(name):
     return element
 
 
-def schema_to_xsl2(schema, phase_name="#DEFAULT"):
+def schema_to_xsl(schema, phase_name="#DEFAULT"):
     if phase_name == "#DEFAULT":
         phase_name = schema.default_phase
 
@@ -155,7 +153,6 @@ def schema_to_xsl2(schema, phase_name="#DEFAULT"):
         priority = 999 + len(pattern.rules)
         for rule in pattern.rules:
             root.append(C('RULE %s' % rule.id))
-            import sys
             rule_element = E('xsl', 'template', {'match': rule.context, 'priority': '%d' % priority, 'mode': 'M%d' % mode_count})
             rule_element.append(E('svrl', 'fired-rule', {'context': rule.context}))
             for assertion in rule.assertions:
