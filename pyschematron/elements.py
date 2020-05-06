@@ -21,7 +21,7 @@ QUERY_BINDINGS = {
 }
 
 class Schema(object):
-    def __init__(self, filename=None, verbosity=0):
+    def __init__(self, filename=None, xml_element=None, verbosity=0):
         """
         Initialize a Schematron Schema object
 
@@ -67,6 +67,8 @@ class Schema(object):
 
         if filename is not None:
             self.read_from_file(filename)
+        elif xml_element is not None:
+            self.from_xml(xml_element)
 
     def set_query_binding(self, query_binding):
         if query_binding is None:
@@ -96,16 +98,14 @@ class Schema(object):
             # in the same way as the skeleton implementation does
             if self.element_number_of_first_pattern is None:
                 self.element_number_of_first_pattern = self.elements_read
-            pattern = Pattern(self)
-            pattern.from_xml(element)
+            pattern = Pattern(self, element)
             if pattern.id == '':
                 pattern.id = "#%d" % len(self.patterns)
             if pattern.id in self.patterns:
                 raise SchematronError("Duplicate pattern id: %s" % pattern.id)
             self.patterns[pattern.id] = pattern
         elif el_name == 'phase':
-            phase = Phase()
-            phase.from_xml(element)
+            phase = Phase(element)
             self.phases[phase.id] = phase
         elif el_name == 'include':
             href = element.attrib['href']
@@ -117,8 +117,7 @@ class Schema(object):
         elif el_name == 'diagnostics':
             if self.diagnostics is not None:
                 raise SchematronError("diagnostics element can only occur once per schema or pattern")
-            self.diagnostics = Diagnostics()
-            self.diagnostics.from_xml(element)
+            self.diagnostics = Diagnostics(element)
         else:
             raise SchematronError("Unknown element in schema: %s" % element.tag)
         self.elements_read += 1
@@ -317,10 +316,12 @@ class Schema(object):
         return report
 
 class Phase(object):
-    def __init__(self):
+    def __init__(self, xml_element=None):
         self.id = None
         self.active_patterns = []
         self.variables = {}
+        if xml_element is not None:
+            self.from_xml(xml_element)
 
     def from_xml(self, phase_element):
         self.id = phase_element.attrib['id']
@@ -351,7 +352,7 @@ class Phase(object):
         return element
 
 class Pattern(object):
-    def __init__(self, schema):
+    def __init__(self, schema, xml_element=None):
         self.schema = schema
         self.abstract = False
         self.isa = None
@@ -363,6 +364,9 @@ class Pattern(object):
         self.id = None
         self.title = None
         self.rules = []
+
+        if xml_element is not None:
+            self.from_xml(xml_element)
 
     def from_xml(self, p_element):
         self.id = p_element.attrib.get("id", "")
@@ -377,8 +381,7 @@ class Pattern(object):
                 continue
             el_name = etree.QName(element.tag).localname
             if el_name == 'rule':
-                rule = Rule(self)
-                rule.from_xml(element, self.variables)
+                rule = Rule(self, element, self.variables)
                 self.rules.append(rule)
             elif el_name == 'let':
                 p_name = element.attrib['name']
@@ -414,7 +417,7 @@ class Pattern(object):
         raise SchematronError("Error: unknown rule with id '%s'" % id)
 
 class Rule(object):
-    def __init__(self, pattern=None):
+    def __init__(self, pattern=None, xml_element=None, variables=None):
         self.context = None
         self.assertions = []
         self.reports = []
@@ -423,6 +426,8 @@ class Rule(object):
         self.abstract = False
         self.pattern = pattern
         self.extends = None
+        if xml_element is not None:
+            self.from_xml(xml_element, variables)
 
     def copy(self):
         new_rule = Rule()
@@ -451,12 +456,10 @@ class Rule(object):
                 continue
             el_name = etree.QName(element.tag).localname
             if el_name == 'assert':
-                assertion = Assertion(rule=self)
-                assertion.from_xml(element, variables)
+                assertion = Assertion(self, element, variables)
                 self.assertions.append(assertion)
             elif el_name == 'report':
-                    report = Report(rule=self)
-                    report.from_xml(element, variables)
+                    report = Report(self, element, variables)
                     self.reports.append(report)
             elif el_name == 'let':
                 p_name = element.attrib['name']
@@ -489,7 +492,7 @@ class RuleTest(object):
     """
     Base class for the tests that are part of rules. Each test can be an Assertion or a Report.
     """
-    def __init__(self, rule):
+    def __init__(self, rule, xml_element=None, variables=None):
         self.id = None
         self.test = None
         self.flag = None
@@ -497,6 +500,8 @@ class RuleTest(object):
         self.diagnostic_ids = []
 
         self.rule = rule
+        if xml_element is not None:
+            self.from_xml(xml_element, variables)
 
     def from_xml(self, a_element, variables):
         self.test = a_element.attrib['test']
@@ -546,8 +551,10 @@ class Report(RuleTest):
 
 
 class Diagnostics(object):
-    def __init__(self):
+    def __init__(self, xml_element=None):
         self.diagnostics = {}
+        if xml_element is not None:
+            self.from_xml(xml_element)
 
     def from_xml(self, d_element):
         for element in d_element:
@@ -556,8 +563,7 @@ class Diagnostics(object):
                 continue
             el_name = etree.QName(element.tag).localname
             if el_name == 'diagnostic':
-                diagnostic = Diagnostic()
-                diagnostic.from_xml(element)
+                diagnostic = Diagnostic(element)
                 self.diagnostics[diagnostic.id] = diagnostic
             else:
                 raise SchematronError("Unknown element in diagnostics element: %s" % (element.tag))
@@ -569,12 +575,15 @@ class Diagnostics(object):
         return self.diagnostics[key]
 
 class Diagnostic(object):
-    def __init__(self):
+    def __init__(self, xml_element=None):
         self.id = None
         self.language = None
         self.text = None
+        if xml_element is not None:
+            self.from_xml(xml_element)
 
     def from_xml(self, element):
         self.id = element.attrib['id']
         self.language = element.attrib.get('{http://www.w3.org/XML/1998/namespace}lang')
         self.text = element.text
+
