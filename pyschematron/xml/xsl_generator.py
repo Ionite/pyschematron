@@ -174,41 +174,11 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
                     successful_report.append(E('xsl', 'attribute', {'name': 'flag'}, text=report.flag))
                 successful_report.append(E('xsl', 'attribute', {'name': 'location'}, child=E('xsl', 'apply-templates', {'select': '.', 'mode': 'schematron-select-full-path'})))
 
-                # Convert the textual part of the report
-                #successful_report.append(E('svrl', 'text', text=(report.text or "")))
-                text_parts = report.new_text
-                text_element = E('svrl', 'text')
-                #text_element = E('svrl', 'text', text=text_parts.initial_text)
-                text_subelement = None
-                for part in text_parts.parts:
-                    if type(part) == BasicText:
-                        #last_subelement.tail = part.to_string()
-                        #text_element.text = text_element.text + part.text
-                        if text_subelement is None:
-                            text_element.text = part.text
-                        else:
-                            text_subelement.tail = part.text
-                    elif type(part) == NameText:
-                        text_subelement = E('xsl', 'value-of', {'select': 'name(%s)' % (part.path or '.')})
-                        text_element.append(text_subelement)
-                    # The skeleton implementation adds empty xsl:text elements here, why?
-                    text_subelement = E('xsl', 'text')
-                    text_element.append(text_subelement)
-                    #text_element.text = str(text_parts.parts)
+                text_element = create_ruletest_text_element(report)
                 successful_report.append(text_element)
 
-                #successful_report.append(text_element)
-
                 # Add diagnostics
-                for diagnostic_id in report.diagnostic_ids:
-                    diagnostic = report.get_diagnostic(diagnostic_id)
-                    diagnostic_reference = E('svrl', 'diagnostic-reference', {'diagnostic': diagnostic_id})
-                    if diagnostic.language is not None:
-                        diagnostic_attr = E('xsl', 'attribute', {'name': 'xml:lang'}, text=diagnostic.language)
-                        diagnostic_attr.tail = diagnostic.text
-                        diagnostic_reference.append(diagnostic_attr)
-                    else:
-                        diagnostic_reference.text = diagnostic.text
+                add_ruletest_diagnostics(report, successful_report)
 
                 if_element.append(successful_report)
                 rule_element.append(if_element)
@@ -225,38 +195,10 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
                     failed_assert.append(E('xsl', 'attribute', {'name': 'flag'}, text=assertion.flag))
                 failed_assert.append(E('xsl', 'attribute', {'name': 'location'}, child=E('xsl', 'apply-templates', {'select': '.', 'mode': 'schematron-select-full-path'})))
 
-                text_parts = assertion.new_text
-                text_element = E('svrl', 'text')
-                #text_element = E('svrl', 'text', text=text_parts.initial_text)
-                text_subelement = None
-                for part in text_parts.parts:
-                    if type(part) == BasicText:
-                        #last_subelement.tail = part.to_string()
-                        #text_element.text = text_element.text + part.text
-                        if text_subelement is None:
-                            text_element.text = part.text
-                        else:
-                            text_subelement.tail = part.text
-                    elif type(part) == NameText:
-                        text_subelement = E('xsl', 'value-of', {'select': 'name(%s)' % (part.path or '.')})
-                        text_element.append(text_subelement)
-                    # The skeleton implementation adds empty xsl:text elements here, why?
-                    text_subelement = E('xsl', 'text')
-                    text_element.append(text_subelement)
-                    #text_element.text = str(text_parts.parts)
+                text_element = create_ruletest_text_element(assertion)
                 failed_assert.append(text_element)
 
-
-                for diagnostic_id in assertion.diagnostic_ids:
-                    diagnostic = assertion.get_diagnostic(diagnostic_id)
-                    diagnostic_reference = E('svrl', 'diagnostic-reference', {'diagnostic': diagnostic_id})
-                    if diagnostic.language is not None:
-                        diagnostic_attr = E('xsl', 'attribute', {'name': 'xml:lang'}, text=diagnostic.language)
-                        diagnostic_attr.tail = diagnostic.text
-                        diagnostic_reference.append(diagnostic_attr)
-                    else:
-                        diagnostic_reference.text = diagnostic.text
-                    failed_assert.append(diagnostic_reference)
+                add_ruletest_diagnostics(assertion, failed_assert)
 
                 otherwise.append(failed_assert)
                 choose.append(otherwise)
@@ -276,3 +218,41 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
         mode_count += 1
 
     return root
+
+
+def add_ruletest_diagnostics(assertion, failed_assert):
+    for diagnostic_id in assertion.diagnostic_ids:
+        diagnostic = assertion.get_diagnostic(diagnostic_id)
+        diagnostic_reference = E('svrl', 'diagnostic-reference', {'diagnostic': diagnostic_id})
+        if diagnostic.language is not None:
+            diagnostic_attr = E('xsl', 'attribute', {'name': 'xml:lang'}, text=diagnostic.language)
+            diagnostic_attr.tail = diagnostic.text
+            diagnostic_reference.append(diagnostic_attr)
+        else:
+            diagnostic_reference.text = diagnostic.text
+        failed_assert.append(diagnostic_reference)
+
+
+def create_ruletest_text_element(ruletest):
+    # Convert the textual part of the report
+    # successful_report.append(E('svrl', 'text', text=(report.text or "")))
+    text_parts = ruletest.new_text
+    text_element = E('svrl', 'text')
+    # text_element = E('svrl', 'text', text=text_parts.initial_text)
+    text_subelement = None
+    for part in text_parts.parts:
+        if type(part) == BasicText:
+            # last_subelement.tail = part.to_string()
+            # text_element.text = text_element.text + part.text
+            if text_subelement is None:
+                text_element.text = part.text
+            else:
+                text_subelement.tail = part.text
+        elif type(part) == NameText:
+            text_subelement = E('xsl', 'value-of', {'select': 'name(%s)' % (part.path or '.')})
+            text_element.append(text_subelement)
+        # The skeleton implementation adds empty xsl:text elements here, why?
+        text_subelement = E('xsl', 'text')
+        text_element.append(text_subelement)
+        # text_element.text = str(text_parts.parts)
+    return text_element
