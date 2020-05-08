@@ -5,6 +5,7 @@ import copy
 import os
 import re
 
+from collections import OrderedDict
 from lxml import etree
 
 from pyschematron.exceptions import *
@@ -12,6 +13,7 @@ from pyschematron.util import WorkingDirectory, abstract_replace_vars
 from pyschematron.query_bindings import xslt, xslt2, xpath2
 from pyschematron.validation import ValidationContext, ValidationReport
 from pyschematron.xml import xml_util
+from pyschematron.xml.xsl_generator import E
 
 QUERY_BINDINGS = {
     'None': xslt,
@@ -19,6 +21,66 @@ QUERY_BINDINGS = {
     'xslt2': xslt2,
     'xpath2': xpath2
 }
+
+class ComplexText(object):
+    """
+    Base class for elements that contain text elements, e.g. <p>, or <assert>
+    This class that must be instantiated through other classes
+    """
+
+    def __init__(self, xml_element=None):
+        if not hasattr(self, 'NAME'):
+            raise Exception("base class ComplexText should not be instantiated directly")
+
+        self.parts = []
+        if xml_element is not None:
+            self.from_xml(xml_element)
+
+    def from_xml_child(self, element):
+        el_name = etree.QName(element.tag).localname
+        if el_name == 'span':
+            self.parts.append(SpanText(element))
+        elif el_name == 'emph':
+            self.parts.append(EmphText(element))
+        elif el_name == 'dir':
+            self.parts.append(DirText(element))
+        elif el_name == 'name':
+            self.parts.append(NameText(element))
+        elif el_name == 'value-of':
+            self.parts.append(ValueOfText(element))
+        else:
+            raise SchematronError("TODO: \"%s\"" % el_name)
+        if element.tail is not None:
+            self.parts.append(BasicText(element.tail))
+
+    def from_xml(self, element):
+        if element.text:
+            self.parts.append(BasicText(element.text))
+        for child in element.getchildren():
+            self.from_xml_child(child)
+
+    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+        result = []
+        print("[XX] TO STRING CALLED ON ComplexText! (%d parts)" % len(self.parts))
+        for part in self.parts:
+            result.append(part.to_string(resolve, xml_doc, current_element))
+        return "".join(result)
+
+    def to_xsl(self):
+        element = E('sch', self.NAME)
+        subelement = None
+        for part in self.parts:
+            if part.__class__.__name__ == 'BasicText':
+                if subelement is None:
+                    element.text = part.text
+                else:
+                    subelement.tail = part.text
+            else:
+                subelement = part.to_xsl()
+                element.append(subelement)
+        return element
+
+
 
 class Schema(object):
     def __init__(self, filename=None, xml_element=None, verbosity=0):
@@ -30,29 +92,29 @@ class Schema(object):
         """
 
         #
-        # Specification properties (elements)
-        #
-        # <include> elements are processed directly when reading files
-        self.title = None
-        self.ns_prefixes = {}
-        # self.p (TODO)
-        self.variables = {}
-        self.phases = {}
-        self.patterns = {}
-        self.diagnostics = None
-        # self.diagnostics
-        self.ps = []
-
         # Specification properties (attributes)
         self.id = None
+        self.icon = None
         self.default_phase = None
         self.see = None
         self.fpi = None
         self.xml_lang = None
         self.xml_space = None
-        self.schemaVersion = None
+        self.schema_version = None
         self.query_binding_name = None
         self.query_binding = None
+
+
+        # Specification properties (elements)
+        self.title = None
+        self.ns_prefixes = OrderedDict()
+        self.paragraphs = []
+        self.variables = {}
+        self.phases = {}
+        self.patterns = {}
+        # Another paragraphs?
+        self.diagnostics = None
+        # <include> elements are processed directly when reading files
 
         #
         # Implementation properties
@@ -109,11 +171,11 @@ class Schema(object):
             self.phases[phase.id] = phase
         elif el_name == 'include':
             href = element.attrib['href']
+            included_doc = etree.parse(href)
             with WorkingDirectory(os.path.dirname(os.path.abspath(href))):
-                included_doc = etree.parse(href)
                 self._parse_xml_child(included_doc.getroot())
         elif el_name == 'p':
-            self.ps.append(element.text)
+            self.paragraphs.append(ParagraphText(element))
         elif el_name == 'diagnostics':
             if self.diagnostics is not None:
                 raise SchematronError("diagnostics element can only occur once per schema or pattern")
@@ -125,11 +187,12 @@ class Schema(object):
     def from_xml(self, root):
         # Process the attributes
         self.id = root.attrib.get("id", "")
+        self.icon = root.attrib.get("icon")
         self.see = root.attrib.get("see", "")
         self.fpi = root.attrib.get("fpi", "")
         self.xml_lang = root.attrib.get("xml:lang", "")
         self.xml_space = root.attrib.get("xml:space", "default")
-        self.schemaVersion = root.attrib.get("schemaVersion", "")
+        self.schema_version = root.attrib.get("schemaVersion", "")
         self.default_phase = root.attrib.get("defaultPhase", "#ALL")
         self.set_query_binding(root.attrib.get('queryBinding'))
 
@@ -171,16 +234,17 @@ class Schema(object):
         for pattern in self.patterns.values():
             new_rules = []
             for rule in pattern.rules:
-                if rule.extends is not None:
-                    orig_rule = pattern.get_rule(rule.extends)
-                    for assertion in orig_rule.assertions:
-                        rule.assertions.append(assertion)
-                    for report in orig_rule.reports:
-                        rule.reports.append(report)
-                    rule.extends = None
+                if rule.extends is not None and len(rule.extends) > 0:
+                    for extends in rule.extends:
+                        orig_rule = pattern.get_rule(extends)
+                        for assertion in orig_rule.assertions:
+                            rule.assertions.append(assertion)
+                        for report in orig_rule.reports:
+                            rule.reports.append(report)
+                    rule.extends = []
                 if not rule.abstract:
                     new_rules.append(rule)
-            #pattern.rules = new_rules
+            # pattern.rules = new_rules
         self.abstract_rules_processed = True
 
     def process_abstract_patterns(self):
@@ -192,11 +256,11 @@ class Schema(object):
         for pattern in self.patterns.values():
             if pattern.abstract:
                 continue
-            elif pattern.isa is not None:
+            elif pattern.is_a is not None:
                 # print("applying %s to %s" % (pattern.isa, pattern.id))
                 # print("rule count: %d" % len(pattern.rules))
-                abstract = self.get_pattern(pattern.isa)
-                pattern.isa = None
+                abstract = self.get_pattern(pattern.is_a)
+                pattern.is_a = None
                 # for pk,pv in pattern.variables.items():
                 # Do Note: abstract is the pattern defining the rules; the isa origin defines the parameters
                 for rule in [r.copy() for r in abstract.rules]:
@@ -244,7 +308,7 @@ class Schema(object):
         root = xml_util.create('schema', add_nsmap=True)
         xml_util.set_attr(root, 'id', self.id)
         xml_util.set_attr(root, 'defaultPhase', self.default_phase)
-        xml_util.set_attr(root, 'schemaVersion', self.schemaVersion)
+        xml_util.set_attr(root, 'schemaVersion', self.schema_version)
         xml_util.set_attr(root, 'queryBinding', self.query_binding_name)
         xml_util.set_variables(root, self.variables)
 
@@ -312,16 +376,46 @@ class Schema(object):
 
                     rule_context.validate_assertions(element, report)
 
-        #print("[XX] " + str(fired_rules))
+        # print("[XX] " + str(fired_rules))
         return report
+
 
 class Phase(object):
     def __init__(self, xml_element=None):
         self.id = None
-        self.active_patterns = []
+        self.icon = None
+        self.see = None
+        self.fpi = None
+        self.xml_lang = None
+        self.xml_space = None
+
+        self.paragraphs = []
         self.variables = {}
+        self.active_patterns = []
+
         if xml_element is not None:
             self.from_xml(xml_element)
+
+    def _parse_xml_child(self, element):
+        el_name = etree.QName(element.tag).localname
+        if el_name == 'p':
+            self.paragraphs.append(ParagraphText(element))
+        elif el_name == 'let':
+            p_name = element.attrib['name']
+            p_value = element.attrib['value']
+            self.variables[p_name] = p_value
+        elif el_name == 'active':
+            # TODO: it appears 'active' can also contain text, dir, emph, and span;
+            # this is not implemented atm; but we probably need to make a class of that
+            # as well (can just subclass ComplexText)
+            self.active_patterns.append(element.attrib["pattern"])
+        elif el_name == 'include':
+            href = element.attrib['href']
+            included_doc = etree.parse(href)
+            with WorkingDirectory(os.path.dirname(os.path.abspath(href))):
+                self._parse_xml_child(included_doc.getroot())
+        else:
+            raise SchematronError("Unknown element in phase: %s: %s" % (self.id, element.tag))
 
     def from_xml(self, phase_element):
         self.id = phase_element.attrib['id']
@@ -329,15 +423,7 @@ class Phase(object):
             cls = element.__class__.__name__
             if cls == "_Comment":
                 continue
-            el_name = etree.QName(element.tag).localname
-            if el_name == 'active':
-                self.active_patterns.append(element.attrib["pattern"])
-            elif el_name == 'let':
-                p_name = element.attrib['name']
-                p_value = element.attrib['value']
-                self.variables[p_name] = p_value
-            else:
-                raise SchematronError("Unknown element in phase: %s: %s" % (self.id, element.tag))
+            self._parse_xml_child(element)
 
     def to_minimal_xml(self):
         element = xml_util.create('phase')
@@ -351,50 +437,75 @@ class Phase(object):
 
         return element
 
+
 class Pattern(object):
     def __init__(self, schema, xml_element=None):
-        self.schema = schema
+        # Specification properties (attributes)
         self.abstract = False
-        self.isa = None
-
-        self.variables = {}
-
-        self.params = {}
-
+        self.is_a = None
         self.id = None
+        self.icon = None
+        self.see = None
+        self.fpi = None
+        self.xml_lang = None
+        self.xml_space = None
         self.title = None
+
+        # Specification properties (elements)
+        self.paragraphs = []
+        self.variables = {}
         self.rules = []
+        self.params = {}
+        # <include> files are handled directly
+
+        # Implementation properties
+        self.schema = schema
 
         if xml_element is not None:
             self.from_xml(xml_element)
 
+    def _parse_xml_child(self, element):
+        el_name = etree.QName(element.tag).localname
+        if el_name == 'title':
+            self.title = element.text
+        elif el_name == 'p':
+            self.paragraphs.append(ParagraphText(element))
+        elif el_name == 'let':
+            p_name = element.attrib['name']
+            p_value = element.attrib['value']
+            self.variables[p_name] = p_value
+        elif el_name == 'rule':
+            rule = Rule(self, element, self.variables)
+            self.rules.append(rule)
+        elif el_name == 'param':
+            p_name = element.attrib['name']
+            p_value = element.attrib['value']
+            self.params[p_name] = p_value
+        elif el_name == 'include':
+            href = element.attrib['href']
+            included_doc = etree.parse(href)
+            with WorkingDirectory(os.path.dirname(os.path.abspath(href))):
+                self._parse_xml_child(included_doc.getroot())
+        else:
+            raise SchematronError("Unknown element in pattern: %s: %s" % (self.id, element.tag))
+
     def from_xml(self, p_element):
-        self.id = p_element.attrib.get("id", "")
         if "abstract" in p_element.attrib and p_element.attrib['abstract'] == 'true':
             self.abstract = True
         if "is-a" in p_element.attrib:
-            self.isa = p_element.attrib['is-a']
+            self.is_a = p_element.attrib['is-a']
+        self.id = p_element.attrib.get("id", "")
+        self.icon = p_element.attrib.get("icon")
+        self.see = p_element.attrib.get("see")
+        self.fpi = p_element.attrib.get("fpi")
+        self.xml_lang = p_element.attrib.get("xml:lang")
+        self.xml_space = p_element.attrib.get("xml:space")
 
         for element in p_element:
             cls = element.__class__.__name__
             if cls == "_Comment":
                 continue
-            el_name = etree.QName(element.tag).localname
-            if el_name == 'rule':
-                rule = Rule(self, element, self.variables)
-                self.rules.append(rule)
-            elif el_name == 'let':
-                p_name = element.attrib['name']
-                p_value = element.attrib['value']
-                self.variables[p_name] = p_value
-            elif el_name == 'param':
-                p_name = element.attrib['name']
-                p_value = element.attrib['value']
-                self.params[p_name] = p_value
-            elif el_name == 'title':
-                self.title = element.text
-            else:
-                raise SchematronError("Unknown element in pattern: %s: %s" % (self.id, element.tag))
+            self._parse_xml_child(element)
 
     def read_from_file(self, file_path):
         xml = etree.parse(file_path)
@@ -416,16 +527,28 @@ class Pattern(object):
                 return r
         raise SchematronError("Error: unknown rule with id '%s'" % id)
 
+
 class Rule(object):
     def __init__(self, pattern=None, xml_element=None, variables=None):
+        self.flag = None
+        self.abstract = False
         self.context = None
+        self.id = None
+        self.icon = None
+        self.see = None
+        self.fpi = None
+        self.xml_lang = None
+        self.xml_space = None
+        self.role = None
+        self.subject = None
+
+        self.variables = OrderedDict()
         self.assertions = []
         self.reports = []
-        self.variables = {}
-        self.id = None
-        self.abstract = False
+        self.extends = []
+        # includes are handled directly when parsing
+
         self.pattern = pattern
-        self.extends = None
         if xml_element is not None:
             self.from_xml(xml_element, variables)
 
@@ -439,6 +562,30 @@ class Rule(object):
         new_rule.abstract = self.abstract
         new_rule.pattern = self.pattern
         return new_rule
+
+    def _parse_xml_child(self, element, variables):
+        el_name = etree.QName(element.tag).localname
+        if el_name == 'p':
+            self.paragraphs.append(ParagraphText(element))
+        elif el_name == 'let':
+            p_name = element.attrib['name']
+            p_value = element.attrib['value']
+            self.variables[p_name] = p_value
+        elif el_name == 'assert':
+            assertion = Assertion(self, element)
+            self.assertions.append(assertion)
+        elif el_name == 'report':
+            report = Report(self, element)
+            self.reports.append(report)
+        elif el_name == 'extends':
+            self.extends.append(element.attrib['rule'])
+        elif el_name == 'include':
+            href = element.attrib['href']
+            included_doc = etree.parse(href)
+            with WorkingDirectory(os.path.dirname(os.path.abspath(href))):
+                self._parse_xml_child(included_doc.getroot())
+        else:
+            raise SchematronError("Unknown element in rule with context %s: %s" % (self.context, element.tag))
 
     def from_xml(self, r_element, variables):
         self.id = r_element.attrib.get('id', "")
@@ -454,28 +601,7 @@ class Rule(object):
             cls = element.__class__.__name__
             if cls == "_Comment":
                 continue
-            el_name = etree.QName(element.tag).localname
-            if el_name == 'assert':
-                assertion = Assertion(self, element, variables)
-                self.assertions.append(assertion)
-            elif el_name == 'report':
-                    report = Report(self, element, variables)
-                    self.reports.append(report)
-            elif el_name == 'let':
-                p_name = element.attrib['name']
-                p_value = element.attrib['value']
-                self.variables[p_name] = p_value
-            elif el_name == 'extends':
-                self.extends = element.attrib['rule']
-                #if 'rule' in element.attrib:
-                #    rule_id = element.attrib['rule']
-                #    orig_rule = self.pattern.get_rule(rule_id)
-                #    for assertion in orig_rule.assertions:
-                #        self.assertions.append(assertion)
-
-                # Add all rules from the given element if it
-            else:
-                raise SchematronError("Unknown element in rule with context %s: %s" % (self.context, element.tag))
+            self._parse_xml_child(element, variables)
 
     def to_minimal_xml(self):
         element = xml_util.create('rule')
@@ -488,11 +614,16 @@ class Rule(object):
             element.append(report.to_minimal_xml())
         return element
 
-class RuleTest(object):
+
+class RuleTest(ComplexText):
     """
     Base class for the tests that are part of rules. Each test can be an Assertion or a Report.
+    This class is itself a subclass of 'ComplextText', as these can contain complex text values
+    for assertion or report messages.
     """
-    def __init__(self, rule, xml_element=None, variables=None):
+
+    def __init__(self, rule, xml_element=None):
+        super().__init__(xml_element)
         self.id = None
         self.test = None
         self.flag = None
@@ -501,14 +632,16 @@ class RuleTest(object):
 
         self.rule = rule
         if xml_element is not None:
-            self.from_xml(xml_element, variables)
+            self.from_xml(xml_element)
 
-    def from_xml(self, a_element, variables):
+    def from_xml(self, a_element):
+        super().from_xml(a_element)
         self.test = a_element.attrib['test']
         if 'id' in a_element.attrib:
             self.id = a_element.attrib['id']
         if a_element.text is not None:
             self.text = a_element.text.strip()
+            self.new_text = TextElement(a_element)
         if 'diagnostics' in a_element.attrib:
             self.diagnostic_ids = re.split("\s+", a_element.attrib['diagnostics'])
 
@@ -527,16 +660,21 @@ class RuleTest(object):
         if diagnostic_id in self.rule.pattern.schema.diagnostics:
             return self.rule.pattern.schema.diagnostics[diagnostic_id].text
 
+
 class Assertion(RuleTest):
+    NAME = 'assert'
     # Assert statements can have a flag attribute
-    def from_xml(self, a_element, variables):
-        super().from_xml(a_element, variables)
+    def from_xml(self, a_element):
+        super().from_xml(a_element)
         if 'flag' in a_element.attrib:
             self.flag = a_element.attrib['flag']
         else:
             self.flag = "error"
 
+
 class Report(RuleTest):
+    NAME = 'report'
+
     def to_minimal_xml(self):
         """
         This inverts the statement of the report, and returns the result as
@@ -574,11 +712,13 @@ class Diagnostics(object):
     def __getitem__(self, key):
         return self.diagnostics[key]
 
+
 class Diagnostic(object):
     def __init__(self, xml_element=None):
         self.id = None
         self.language = None
         self.text = None
+        self.new_text = None
         if xml_element is not None:
             self.from_xml(xml_element)
 
@@ -586,4 +726,158 @@ class Diagnostic(object):
         self.id = element.attrib['id']
         self.language = element.attrib.get('{http://www.w3.org/XML/1998/namespace}lang')
         self.text = element.text
+        self.new_text = TextElement(element)
 
+
+class TextElement(object):
+    """Contains the text part of objects like Assertion and Report
+
+    These text parts can themselves contain XML elements such as <emph> or <value-of>, so this class keeps a list of the individual parts
+    that make a text section.
+    """
+
+    def __init__(self, xml_element=None):
+        self.parts = []
+
+        if xml_element is not None:
+            self.from_xml(xml_element)
+
+    def from_xml_child(self, element):
+        el_name = etree.QName(element.tag).localname
+        if el_name == 'name':
+            self.parts.append(NameText(element))
+        elif el_name == 'p':
+            self.parts.append(ParagraphText(element))
+        elif el_name == 'value-of':
+            self.parts.append(ValueOfText(element))
+        elif el_name == 'span':
+            self.parts.append(SpanText(element))
+        elif el_name == 'emph':
+            self.parts.append(EmphText(element))
+        elif el_name == 'dir':
+            self.parts.append(DirText(element))
+        else:
+            raise SchematronError("TODO: '%s'" % el_name)
+        if element.tail is not None:
+            self.parts.append(BasicText(element.tail))
+
+    def from_xml(self, element):
+        if element.text:
+            self.parts.append(BasicText(element.text))
+        for child in element.getchildren():
+            self.from_xml_child(child)
+
+    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+        result = []
+        for part in self.parts:
+            result.append(part.to_string(resolve, xml_doc, current_element))
+        return "".join(result)
+
+
+class BasicText:
+    """XML text without an element (e.g. _Element.text or _Element.tail)"""
+    def __init__(self, text):
+        self.text = text
+
+    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+        return self.text
+
+
+class NameText(object):
+    """The <name> objects"""
+    def __init__(self, xml_element):
+        self.path = xml_element.attrib.get('path')
+
+    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+        if resolve:
+            raise Exception("TODO")
+        else:
+            path_attr = ""
+            if self.path is not None:
+                path_attr = 'path="%s" ' % self.path
+            return "<name %s/>" % path_attr
+
+
+class ValueOfText(object):
+    """The <value-of> objects"""
+    def __init__(self, xml_element):
+        self.select = xml_element.attrib.get('select')
+
+    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+        if resolve:
+            raise Exception("TODO")
+        else:
+            select_attr = ""
+            if self.select is not None:
+                select_attr = 'select="%s" ' % self.select
+            return "<value-of %s/>" % select_attr
+
+
+class TitleText(ComplexText):
+    NAME = 'title'
+    ALLOWED_CHILDREN = [ 'dir' ]
+
+class ParagraphText(ComplexText):
+    NAME = 'p'
+    ALLOWED_CHILDREN = [ 'span', 'emph', 'dir' ]
+
+class SimpleText(object):
+    def __init__(self, xml_element):
+        if not hasattr(self, 'NAME'):
+            raise Exception("base class SimpleText should not be instantiated directly")
+        self.text = xml_element.text
+
+    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+        return self.text
+
+    def to_xsl(self):
+        return E('sch', self.NAME, text=self.text)
+
+
+class SpanText(SimpleText):
+    def __init__(self, xml_element):
+        super().__init__(xml_element)
+        self.cls = xml_element.attrib.get('class')
+
+    def to_xsl(self):
+        result = super().to_xsl()
+        if self.value is not None:
+            result.attrib['class'] = self.cls
+        return result
+
+
+class EmphText(SimpleText):
+    NAME = 'emph'
+
+
+class DirText(SimpleText):
+    NAME = 'dir'
+
+    def __init__(self, xml_element):
+        super().__init__(xml_element)
+        self.value = xml_element.attrib.get('value')
+
+    def to_xsl(self):
+        result = super().to_xsl()
+        if self.value is not None:
+            result.attrib['value'] = self.value
+        return result
+
+
+#
+# CURRENT TODO:
+# recreate the to_xsl for at least all *Text classes
+# add a test to see whether xsl output is valid xsl style sheet?
+# add to_text and to_html as well, also for all elements
+# before or after? generalize into base class and impl class
+# add attributes as defined in the spec (also see https://www.mulberrytech.com/quickref/schematron_rev1.pdf )
+# and https://www.data2type.de/en/xml-xslt-xslfo/schematron/schematron-reference/
+
+# Suggestions for abstracting:
+# - straight text
+# - elements with only text (emph, dir, span, etc)
+# - elements with subelements (let base class handle all, and specifiy 'allowed'?)
+
+# then:
+# consider for the rest as well? can we ease up on xsl_generator then?
+# should we 'allow-foreign' too?
