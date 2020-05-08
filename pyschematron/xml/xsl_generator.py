@@ -1,6 +1,7 @@
 from lxml import etree
 from pyschematron.xml.xsl_predefined_elements import get_predefined_elements_xslt1, get_predefined_elements_xslt2
 from pyschematron.elements import *
+import pyschematron
 
 import copy
 
@@ -232,13 +233,47 @@ def add_ruletest_diagnostics(assertion, failed_assert):
             diagnostic_reference.text = diagnostic.text
         failed_assert.append(diagnostic_reference)
 
-
 def create_ruletest_text_element(ruletest):
     # Convert the textual part of the report
     # successful_report.append(E('svrl', 'text', text=(report.text or "")))
     text_parts = ruletest.new_text
     text_element = E('svrl', 'text')
-    # text_element = E('svrl', 'text', text=text_parts.initial_text)
+    text_subelement = None
+    for part in text_parts.parts:
+        if part.__class__.__name__ == 'BasicText':
+            # last_subelement.tail = part.to_string()
+            # text_element.text = text_element.text + part.text
+            if text_subelement is None:
+                text_element.text = part.text
+            else:
+                text_subelement.tail = part.text
+        elif type(part) == pyschematron.elements.NameText:
+            text_subelement = E('xsl', 'value-of', {'select': 'name(%s)' % (part.path or '.')})
+            text_element.append(text_subelement)
+        elif type(part) == pyschematron.elements.ValueOfText:
+            text_subelement = E('xsl', 'value-of', {'select': '%s' % (part.select or '.')})
+            text_element.append(text_subelement)
+        elif type(part) == pyschematron.elements.ParagraphText:
+            text_subelement = part.to_xsl()
+            text_element.append(text_subelement)
+        elif type(part) == pyschematron.elements.EmphText:
+            text_subelement = part.to_xsl()
+            text_element.append(text_subelement)
+        elif type(part) == pyschematron.elements.DirText:
+            text_subelement = part.to_xsl()
+            text_element.append(text_subelement)
+        else:
+            raise SchematronError("Not implemented: subelementtype %s in xslt" % str(type(part)))
+        # The skeleton implementation adds empty xsl:text elements here, why?
+        text_subelement = E('xsl', 'text')
+        text_element.append(text_subelement)
+        # text_element.text = str(text_parts.parts)
+    return text_element
+
+
+def subcreate_ruletest_text_element(ruletest, namespace, element_name):
+    text_parts = ruletest.new_text
+    text_element = E('svrl', 'text')
     text_subelement = None
     for part in text_parts.parts:
         if type(part) == BasicText:
