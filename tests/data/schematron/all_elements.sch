@@ -24,9 +24,6 @@
   <phase id="noah" is-a="abstractPattern">
     <active pattern="noah" is-a="abstractPattern" />
   </phase>
-  <phase id="abstractPattern" abstract="true">
-    <active pattern="abstractPattern" abstract="true" />
-  </phase>
   <phase id="pattern">
     <active pattern="pattern" />
   </phase>
@@ -135,5 +132,10 @@
     </rule>
   </pattern>
 
-  <include href="diagnostics.xml" />
+  <diagnostics>
+    <diagnostic id="number">
+      Noah, you must remove as many animals from the ark so that
+      only two of one species live in this accommodation.
+    </diagnostic>
+  </diagnostics>
 </schema>

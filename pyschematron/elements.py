@@ -509,6 +509,7 @@ class RuleTest(object):
             self.id = a_element.attrib['id']
         if a_element.text is not None:
             self.text = a_element.text.strip()
+            self.new_text = TextElement(a_element)
         if 'diagnostics' in a_element.attrib:
             self.diagnostic_ids = re.split("\s+", a_element.attrib['diagnostics'])
 
@@ -587,3 +588,55 @@ class Diagnostic(object):
         self.language = element.attrib.get('{http://www.w3.org/XML/1998/namespace}lang')
         self.text = element.text
 
+
+class TextElement(object):
+    """Contains the text part of objects like Assertion and Report
+
+    These text parts can themselves contain XML elements such as <emph> or <value-of>, so this class keeps a list of the individual parts
+    that make a text section.
+    """
+    def __init__(self, xml_element=None):
+        self.initial_text = ""
+        self.parts = []
+
+        if xml_element is not None:
+            self.initial_text = xml_element.text or ""
+            self.from_xml(xml_element)
+
+    def from_xml_child(self, element):
+        el_name = etree.QName(element.tag).localname
+        if el_name == 'name':
+            self.parts.append(NameText(element))
+        if element.tail is not None:
+            self.parts.append(BasicText(element.tail))
+
+
+    def from_xml(self, element):
+        if element.text:
+            self.parts.append(BasicText(element.text))
+        for child in element.getchildren():
+            self.from_xml_child(child)
+
+    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+        result = []
+        for part in self.parts:
+            result.append(part.to_string(resolve, xml_doc, current_element))
+        return "".join(result)
+
+
+class BasicText(object):
+    def __init__(self, text):
+        self.text = text
+
+    def to_string(self):
+        return self.text
+
+class NameText(object):
+    def __init__(self, xml_element):
+        self.path = xml_element.attrib.get('path')
+
+    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+        if resolve:
+            raise Exception("TODO")
+        else:
+            return "<name %s/>" % (self.path or "")
