@@ -607,9 +607,12 @@ class TextElement(object):
         el_name = etree.QName(element.tag).localname
         if el_name == 'name':
             self.parts.append(NameText(element))
+        elif el_name == 'value-of':
+            self.parts.append(ValueOfText(element))
+        else:
+            raise SchematronError("TODO: %s" % el_name)
         if element.tail is not None:
             self.parts.append(BasicText(element.tail))
-
 
     def from_xml(self, element):
         if element.text:
@@ -639,4 +642,21 @@ class NameText(object):
         if resolve:
             raise Exception("TODO")
         else:
-            return "<name %s/>" % (self.path or "")
+            path_attr = ""
+            if self.path is not None:
+                path_attr = 'path="%s" ' % self.path
+            return "<name %s/>" % path_attr
+
+class ValueOfText(object):
+    def __init__(self, xml_element):
+        self.select = xml_element.attrib.get('select')
+
+    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+        if resolve:
+            raise Exception("TODO")
+        else:
+            select_attr = ""
+            if self.select is not None:
+                select_attr = 'select="%s" ' % self.select
+            return "<value-of %s/>" % select_attr
+

@@ -251,6 +251,11 @@ def create_ruletest_text_element(ruletest):
         elif type(part) == NameText:
             text_subelement = E('xsl', 'value-of', {'select': 'name(%s)' % (part.path or '.')})
             text_element.append(text_subelement)
+        elif type(part) == ValueOfText:
+            text_subelement = E('xsl', 'value-of', {'select': '%s' % (part.select or '.')})
+            text_element.append(text_subelement)
+        else:
+            raise SchematronError("Not implemented: subelementtype %s in xslt" % str(type(part)))
         # The skeleton implementation adds empty xsl:text elements here, why?
         text_subelement = E('xsl', 'text')
         text_element.append(text_subelement)
