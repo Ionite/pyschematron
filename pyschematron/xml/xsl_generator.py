@@ -189,7 +189,7 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
                         else:
                             text_subelement.tail = part.text
                     elif type(part) == NameText:
-                        text_subelement = E('xsl', 'value-of', {'select': 'name(%s)' % part.path or '.'})
+                        text_subelement = E('xsl', 'value-of', {'select': 'name(%s)' % (part.path or '.')})
                         text_element.append(text_subelement)
                     # The skeleton implementation adds empty xsl:text elements here, why?
                     text_subelement = E('xsl', 'text')
@@ -224,7 +224,29 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
                 if assertion.flag and assertion.flag != 'error':
                     failed_assert.append(E('xsl', 'attribute', {'name': 'flag'}, text=assertion.flag))
                 failed_assert.append(E('xsl', 'attribute', {'name': 'location'}, child=E('xsl', 'apply-templates', {'select': '.', 'mode': 'schematron-select-full-path'})))
-                failed_assert.append(E('svrl', 'text', text=(assertion.text or "")))
+
+                text_parts = assertion.new_text
+                text_element = E('svrl', 'text')
+                #text_element = E('svrl', 'text', text=text_parts.initial_text)
+                text_subelement = None
+                for part in text_parts.parts:
+                    if type(part) == BasicText:
+                        #last_subelement.tail = part.to_string()
+                        #text_element.text = text_element.text + part.text
+                        if text_subelement is None:
+                            text_element.text = part.text
+                        else:
+                            text_subelement.tail = part.text
+                    elif type(part) == NameText:
+                        text_subelement = E('xsl', 'value-of', {'select': 'name(%s)' % (part.path or '.')})
+                        text_element.append(text_subelement)
+                    # The skeleton implementation adds empty xsl:text elements here, why?
+                    text_subelement = E('xsl', 'text')
+                    text_element.append(text_subelement)
+                    #text_element.text = str(text_parts.parts)
+                failed_assert.append(text_element)
+
+
                 for diagnostic_id in assertion.diagnostic_ids:
                     diagnostic = assertion.get_diagnostic(diagnostic_id)
                     diagnostic_reference = E('svrl', 'diagnostic-reference', {'diagnostic': diagnostic_id})
