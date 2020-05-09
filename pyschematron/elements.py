@@ -742,6 +742,9 @@ class SpanText(object):
     def to_string(self):
         return self.text
 
+    def to_xsl(self):
+        return E('sch', 'span', text=self.text)
+
 
 class EmphText(object):
     def __init__(self, xml_element):
@@ -763,9 +766,23 @@ class DirText(object):
         return self.text
 
     def to_xsl(self):
-        return E('sch', 'emph', text=self.text)
+        return E('sch', 'dir', text=self.text)
 
 
 #
-# CURRENT TODO
-#
+# CURRENT TODO:
+# recreate the to_xsl for at least all *Text classes
+# add a test to see whether xsl output is valid xsl style sheet
+# add to_text and to_html as well, also for all elements
+# before or after? generalize into base class and impl class
+# add attributes as defined in the spec (also see https://www.mulberrytech.com/quickref/schematron_rev1.pdf )
+# and https://www.data2type.de/en/xml-xslt-xslfo/schematron/schematron-reference/
+
+# Suggestions for abstracting:
+# - straight text
+# - elements with only text (emph, dir, span, etc)
+# - elements with subelements (let base class handle all, and specifiy 'allowed'?)
+
+# then:
+# consider for the rest as well? can we ease up on xsl_generator then?
+# should we 'allow-foreign' too?
