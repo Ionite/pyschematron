@@ -734,8 +734,20 @@ class ParagraphText(object):
                 element.append(subelement)
         return element
 
+class SimpleText(object):
+    def __init__(self, xml_element):
+        if not hasattr(self, 'NAME'):
+            raise Exception("base class SimpleText should not be instantiated directly")
+        self.text = xml_element.text
 
-class SpanText(object):
+    def to_string(self):
+        return self.text
+
+    def to_xsl(self):
+        return E('sch', self.NAME, text=self.text)
+
+
+class SpanText(SimpleText):
     def __init__(self, xml_element):
         self.text = xml_element.text
 
@@ -746,33 +758,28 @@ class SpanText(object):
         return E('sch', 'span', text=self.text)
 
 
-class EmphText(object):
+class EmphText(SimpleText):
+    NAME = 'emph'
+
+
+class DirText(SimpleText):
+    NAME = 'dir'
+
     def __init__(self, xml_element):
-        self.text = xml_element.text
-
-    def to_string(self):
-        return self.text
-
-    def to_xsl(self):
-        return E('sch', 'emph', text=self.text)
-
-
-class DirText(object):
-    def __init__(self, xml_element):
+        super().__init__(xml_element)
         self.value = xml_element.attrib.get('value')
-        self.text = xml_element.text
-
-    def to_string(self):
-        return self.text
 
     def to_xsl(self):
-        return E('sch', 'dir', text=self.text)
+        result = super().to_xsl()
+        if self.value is not None:
+            result.attrib['value'] = self.value
+        return result
 
 
 #
 # CURRENT TODO:
 # recreate the to_xsl for at least all *Text classes
-# add a test to see whether xsl output is valid xsl style sheet
+# add a test to see whether xsl output is valid xsl style sheet?
 # add to_text and to_html as well, also for all elements
 # before or after? generalize into base class and impl class
 # add attributes as defined in the spec (also see https://www.mulberrytech.com/quickref/schematron_rev1.pdf )
