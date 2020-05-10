@@ -647,6 +647,7 @@ class TextElement(object):
 
 
 class BasicText:
+    """XML text without an element (e.g. _Element.text or _Element.tail)"""
     def __init__(self, text):
         self.text = text
 
@@ -655,6 +656,7 @@ class BasicText:
 
 
 class NameText(object):
+    """The <name> objects"""
     def __init__(self, xml_element):
         self.path = xml_element.attrib.get('path')
 
@@ -669,6 +671,7 @@ class NameText(object):
 
 
 class ValueOfText(object):
+    """The <value-of> objects"""
     def __init__(self, xml_element):
         self.select = xml_element.attrib.get('select')
 
@@ -684,8 +687,8 @@ class ValueOfText(object):
 
 class ComplexText(object):
     """
-    Text element that contains other text elements
-    Base class that must be instantiated through other classes
+    Base class for Text elements that contain other text elements, e.g. <p>
+    This class that must be instantiated through other classes
     """
 
     def __init__(self, xml_element=None):
