@@ -682,16 +682,17 @@ class ValueOfText(object):
             return "<value-of %s/>" % select_attr
 
 
-class ParagraphText(object):
-    """Contains the text part of objects like Assertion and Report
-
-    These text parts can themselves contain XML elements such as <emph> or <value-of>, so this class keeps a list of the individual parts
-    that make a text section.
+class ComplexText(object):
+    """
+    Text element that contains other text elements
+    Base class that must be instantiated through other classes
     """
 
     def __init__(self, xml_element=None):
-        self.parts = []
+        if not hasattr(self, 'NAME'):
+            raise Exception("base class ComplexText should not be instantiated directly")
 
+        self.parts = []
         if xml_element is not None:
             self.from_xml(xml_element)
 
@@ -721,7 +722,7 @@ class ParagraphText(object):
         return "".join(result)
 
     def to_xsl(self):
-        element = E('sch', 'p')
+        element = E('sch', self.NAME)
         subelement = None
         for part in self.parts:
             if part.__class__.__name__ == 'BasicText':
@@ -733,6 +734,14 @@ class ParagraphText(object):
                 subelement = part.to_xsl()
                 element.append(subelement)
         return element
+
+class TitleText(ComplexText):
+    NAME = 'title'
+    ALLOWED_CHILDREN = [ 'dir' ]
+
+class ParagraphText(ComplexText):
+    NAME = 'p'
+    ALLOWED_CHILDREN = [ 'span', 'emph', 'dir' ]
 
 class SimpleText(object):
     def __init__(self, xml_element):
@@ -749,13 +758,14 @@ class SimpleText(object):
 
 class SpanText(SimpleText):
     def __init__(self, xml_element):
-        self.text = xml_element.text
-
-    def to_string(self):
-        return self.text
+        super().__init__(xml_element)
+        self.cls = xml_element.attrib.get('class')
 
     def to_xsl(self):
-        return E('sch', 'span', text=self.text)
+        result = super().to_xsl()
+        if self.value is not None:
+            result.attrib['class'] = self.cls
+        return result
 
 
 class EmphText(SimpleText):
