@@ -113,7 +113,7 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
 
     root.append(C('SCHEMA SETUP'))
     schema_setup = E('xsl', 'template', {'match': '/'})
-    schematron_output = E('svrl', 'schematron-output', {'title': schema.title or "", 'schemaVersion': schema.schemaVersion or ""})
+    schematron_output = E('svrl', 'schematron-output', {'title': schema.title or "", 'schemaVersion': schema.schema_version or ""})
     if phase_name not in ["#DEFAULT", "#ALL"]:
         schematron_output.append(E('xsl', 'attribute', {'name': 'phase'}, text=phase_name))
 

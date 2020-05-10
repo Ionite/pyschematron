@@ -76,7 +76,7 @@ class ValidationContext(object):
                 self.msg(5, "Test: '%s'" % assert_test.test)
                 self.msg(5, "Result: %s" % str(result))
 
-                report.add_failed_assert(self, assert_test)
+                report.add_failed_assert(self, assert_test, element)
         for report_test in rule.reports:
             self.msg(3, "Start report test: %s" % report_test.id)
             self.msg(4, "Test context: %s" % str(rule.context))
@@ -97,7 +97,7 @@ class ValidationContext(object):
                 self.msg(5, "Test: '%s'" % report_test.test)
                 self.msg(5, "Result: %s" % str(result))
 
-                report.add_successful_report(self, report_test)
+                report.add_successful_report(self, report_test, element)
 
 
 class ValidationReport(object):
@@ -107,13 +107,13 @@ class ValidationReport(object):
     def add_fired_rule(self, rule_context):
         self.fired_rules[rule_context] = []
 
-    def add_failed_assert(self, rule_context, assertion):
-        if assertion not in self.fired_rules[rule_context]:
-            self.fired_rules[rule_context].append(assertion)
+    def add_failed_assert(self, rule_context, assertion, element):
+        if (assertion,element) not in self.fired_rules[rule_context]:
+            self.fired_rules[rule_context].append((assertion, element))
     
-    def add_successful_report(self, rule_context, report):
-        if report not in self.fired_rules[rule_context]:
-            self.fired_rules[rule_context].append(report)
+    def add_successful_report(self, rule_context, report, element):
+        if (report,element) not in self.fired_rules[rule_context]:
+            self.fired_rules[rule_context].append((report, element))
 
     def get_failed_asserts(self):
         """
@@ -134,7 +134,7 @@ class ValidationReport(object):
         """
         result = []
         for failed_asserts in self.fired_rules.values():
-            result.extend([fa for fa in failed_asserts if fa.flag == flag])
+            result.extend([fa for fa,el in failed_asserts if fa.flag == flag])
         return result
 
     def get_failed_asserts_by_flag(self, default_flag=None):
@@ -145,7 +145,7 @@ class ValidationReport(object):
         """
         result = {}
         for failed_asserts in self.fired_rules.values():
-            for failed_assert in failed_asserts:
+            for failed_assert, element in failed_asserts:
                 assert_flag = failed_assert.flag
                 if assert_flag is None:
                     assert_flag = default_flag

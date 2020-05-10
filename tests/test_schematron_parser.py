@@ -139,9 +139,9 @@ class TestValidation(unittest.TestCase):
 
         report = schema.validate_document(xml_doc)
         errors = report.get_failed_asserts()
-        error_id_list = [e.id for e in errors if e.flag != 'warning']
+        error_id_list = [err.id for err,element in errors if err.flag != 'warning']
         warnings = report.get_failed_asserts()
-        warning_id_list = [w.id for w in warnings if w.flag == 'warning']
+        warning_id_list = [w.id for w,element in warnings if w.flag == 'warning']
         self.assertEqual(expected_errors, error_id_list)
         self.assertEqual(expected_warnings, warning_id_list)
 
@@ -172,7 +172,7 @@ class TestRuleOrder(unittest.TestCase):
         xml_doc = etree.ElementTree(etree.XML(xml_string))
         report = schema.validate_document(xml_doc)
         errors = report.get_failed_asserts()
-        error_ruleid_list = [e.rule.id for e in errors]
+        error_ruleid_list = [err.rule.id for err,element in errors]
         return error_ruleid_list
 
     def check_rule_order(self, schematron_file):
@@ -335,12 +335,12 @@ class ValidateSchematronFiles(unittest.TestCase):
             # These wouldn't even pass our own parsing, to read them directly
             xml_doc = etree.parse(get_file("schematron", filename))
             report = self.schema.validate_document(xml_doc)
-            self.assertNotEqual([], report.get_failed_asserts(), [a.text for a in report.get_failed_asserts()])
+            self.assertNotEqual([], report.get_failed_asserts(), [a.text for a,element in report.get_failed_asserts()])
 
         for filename in ['malformed/bad_active_pattern.sch']:
             xml_doc = self.get_schematron_minimal_xml(filename)
             report = self.schema.validate_document(xml_doc)
-            self.assertNotEqual([], report.get_failed_asserts(), [a.text for a in report.get_failed_asserts()])
+            self.assertNotEqual([], report.get_failed_asserts(), [a.text for a,element in report.get_failed_asserts()])
 
 class TestDiagnostics(unittest.TestCase):
     def test_simple_diagnostics(self):
@@ -348,10 +348,11 @@ class TestDiagnostics(unittest.TestCase):
         xml_doc = etree.parse(get_file("xml", "diagnostics/more_than_three_animals.xml"))
         report = schema.validate_document(xml_doc)
 
-        self.assertEqual(1, len(report.get_failed_asserts()))
-        self.assertEqual(1, len(report.get_failed_asserts()[0].diagnostic_ids))
+        print(report.get_failed_asserts())
+        self.assertEqual(3, len(report.get_failed_asserts()))
+        self.assertEqual(1, len(report.get_failed_asserts()[0][0].diagnostic_ids))
         self.assertEqual("""Noah, you must remove as many animals from the ark so that
-      only two of one species live in this accommodation.""".strip(), report.get_failed_asserts()[0].get_diagnostic_text(report.get_failed_asserts()[0].diagnostic_ids[0]).strip())
+      only two of one species live in this accommodation.""".strip(), report.get_failed_asserts()[0][0].get_diagnostic_text(report.get_failed_asserts()[0][0].diagnostic_ids[0]).strip())
 
 class TestAllElements(unittest.TestCase):
     def setUp(self):

@@ -36,6 +36,7 @@ def main():
     if args.verbosity > 0:
         for error in errors:
             print("Error: %s" % error.text)
+            print("ErrorToString: %s" % error.to_string(resolve=True, doc, error.xxxx))
             for d_id in error.diagnostic_ids:
                 if d_id in error.rule.pattern.schema.diagnostics:
                     print("Proposal for solution: %s" % error.rule.pattern.schema.diagnostics[d_id].text)
