@@ -11,7 +11,6 @@
     <pattern xmlns="http://purl.oclc.org/dsdl/schematron" id="basic">
         <rule context="Document/Data/Number">
             <assert test=". &gt; 0" id="3" flag="fatal">
-                <p>We have encountered a fatal issue</p>
                 The element <name /> in this <name path="parent::*"/> has the wrong value.
                 It is <value-of select="."/> but it should be positive
                 <emph>This is important!</emph>

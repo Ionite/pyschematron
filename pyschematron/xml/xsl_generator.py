@@ -236,10 +236,10 @@ def add_ruletest_diagnostics(assertion, failed_assert):
 def create_ruletest_text_element(ruletest):
     # Convert the textual part of the report
     # successful_report.append(E('svrl', 'text', text=(report.text or "")))
-    text_parts = ruletest.new_text
+    # TODO: Replace with to_xsl/svrl calls?
     text_element = E('svrl', 'text')
     text_subelement = None
-    for part in text_parts.parts:
+    for part in ruletest.parts:
         if part.__class__.__name__ == 'BasicText':
             # last_subelement.tail = part.to_string()
             # text_element.text = text_element.text + part.text
@@ -272,10 +272,10 @@ def create_ruletest_text_element(ruletest):
 
 
 def subcreate_ruletest_text_element(ruletest, namespace, element_name):
-    text_parts = ruletest.new_text
+    # TODO: Replace with to_xsl/svrl calls?
     text_element = E('svrl', 'text')
     text_subelement = None
-    for part in text_parts.parts:
+    for part in ruletest.parts:
         if type(part) == BasicText:
             # last_subelement.tail = part.to_string()
             # text_element.text = text_element.text + part.text

@@ -11,6 +11,7 @@ from pyschematron.elementpath_extensions.xslt2_parser import XSLT2Parser
 from pyschematron.elementpath_extensions.select import select_with_context
 from pyschematron.elements import Schema
 from pyschematron.exceptions import *
+from pyschematron.commands import validate
 
 BASE_DIR = os.path.abspath("%s/../../" % __file__)
 
@@ -121,7 +122,7 @@ class TestParseSchematron(unittest.TestCase):
                     for a in r.assertions:
                         root_token = parser.parse(a.test)
                         result = root_token.evaluate(context)
-                        self.assertTrue(result, a.text)
+                        self.assertTrue(result, a.to_string())
 
     def test_unknown_querybinding(self):
         self.assertRaises(SchematronNotImplementedError, Schema, get_file("schematron", "unknown_querybinding.sch"))
@@ -172,7 +173,7 @@ class TestRuleOrder(unittest.TestCase):
         xml_doc = etree.ElementTree(etree.XML(xml_string))
         report = schema.validate_document(xml_doc)
         errors = report.get_failed_asserts()
-        error_ruleid_list = [err.rule.id for err,element in errors]
+        error_ruleid_list = [err.parent.id for err,element in errors]
         return error_ruleid_list
 
     def check_rule_order(self, schematron_file):
@@ -335,12 +336,12 @@ class ValidateSchematronFiles(unittest.TestCase):
             # These wouldn't even pass our own parsing, to read them directly
             xml_doc = etree.parse(get_file("schematron", filename))
             report = self.schema.validate_document(xml_doc)
-            self.assertNotEqual([], report.get_failed_asserts(), [a.text for a,element in report.get_failed_asserts()])
+            self.assertNotEqual([], report.get_failed_asserts(), [a.to_string() for a,element in report.get_failed_asserts()])
 
         for filename in ['malformed/bad_active_pattern.sch']:
             xml_doc = self.get_schematron_minimal_xml(filename)
             report = self.schema.validate_document(xml_doc)
-            self.assertNotEqual([], report.get_failed_asserts(), [a.text for a,element in report.get_failed_asserts()])
+            self.assertNotEqual([], report.get_failed_asserts(), [a.to_string() for a,element in report.get_failed_asserts()])
 
 class TestDiagnostics(unittest.TestCase):
     def test_simple_diagnostics(self):
@@ -348,7 +349,6 @@ class TestDiagnostics(unittest.TestCase):
         xml_doc = etree.parse(get_file("xml", "diagnostics/more_than_three_animals.xml"))
         report = schema.validate_document(xml_doc)
 
-        print(report.get_failed_asserts())
         self.assertEqual(3, len(report.get_failed_asserts()))
         self.assertEqual(1, len(report.get_failed_asserts()[0][0].diagnostic_ids))
         self.assertEqual("""Noah, you must remove as many animals from the ark so that
@@ -360,6 +360,17 @@ class TestAllElements(unittest.TestCase):
 
     def test_setup(self):
         pass
+
+
+class TestValidateCommand(unittest.TestCase):
+    def test_validate(self):
+        result = validate.main("data/schematron/all_elements.sch", "data/xml/diagnostics/more_than_three_animals.xml", verbosity=0)
+        self.assertEqual(-1, result)
+
+        result = validate.main("data/schematron/advanced_text.sch", "data/xml/basic1_ok.xml", verbosity=0)
+        self.assertEqual(0, result)
+
+        #validate.main("data/schematron/all_elements.sch", "data/xml/diagnostics/more_than_three_animals.xml", verbosity=1)
 
 if __name__ == '__main__':
     unittest.main()
