@@ -150,7 +150,7 @@ class ValidationReport(object):
                 if assert_flag is None:
                     assert_flag = default_flag
                 if assert_flag in result:
-                    result[assert_flag].append(failed_assert)
+                    result[assert_flag].append((failed_assert, element))
                 else:
-                    result[assert_flag] = [failed_assert]
+                    result[assert_flag] = [(failed_assert, element)]
         return result
