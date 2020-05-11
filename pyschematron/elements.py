@@ -57,6 +57,9 @@ class ComplexText(object):
             self.parts.append(BasicText(element.tail))
 
     def from_xml(self, element):
+        if len(self.parts) > 0:
+            #raise SchematronError("from_xml already called")
+            return
         if element.text:
             self.parts.append(BasicText(element.text))
         for child in element.getchildren():
@@ -64,7 +67,6 @@ class ComplexText(object):
 
     def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
         result = []
-        print("[XX] TO STRING CALLED ON ComplexText! (%d parts)" % len(self.parts))
         for part in self.parts:
             result.append(part.to_string(resolve, xml_doc, current_element, namespaces))
         return "".join(result)
@@ -361,15 +363,17 @@ class Schema(object):
                 if r.abstract:
                     continue
                 rule_context = pattern_context.copy()
-                rule_context.set_rule(r)
 
+                # TODO: should this be done for every matching element?
                 report.add_fired_rule(rule_context)
+                rule_context.set_rule(r)
 
                 # If the context is the literal '/', pass 'None' as the context item to elementpath
                 elements = rule_context.get_rule_context_elements()
                 self.msg(5, "Number of matching elements: %s" % len(elements))
 
                 for element in elements:
+                    rule_context.add_rule_variables(r, element)
                     if element in fired_rules:
                         # Already matched a rule, skip this one
                         continue
@@ -379,7 +383,6 @@ class Schema(object):
 
                     rule_context.validate_assertions(element, report)
 
-        # print("[XX] " + str(fired_rules))
         return report
 
 
@@ -572,7 +575,7 @@ class Rule(object):
             self.paragraphs.append(ParagraphText(element))
         elif el_name == 'let':
             p_name = element.attrib['name']
-            p_value = element.attrib['value']
+            p_value = element.attrib.get('value')
             self.variables[p_name] = p_value
         elif el_name == 'assert':
             assertion = Assertion(self, element)
@@ -818,7 +821,6 @@ class ValueOfText(object):
 
     def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
         if resolve:
-            print(namespaces)
             parser = XPath2Parser(namespaces=namespaces)
             xpc = xpath_context.XPathContext(xml_doc, item=current_element)
             root_node = parser.parse("string(%s)" % (self.select or "."))

@@ -70,18 +70,10 @@
     <rule context="ark:animal">
       <let name="animalSpecies" value="ark:species" />
       <report test="count(parent::*/ark:animal[ark:species=$animalSpecies]) &gt; 2">
-        There are more than two
-        <name />
-        elements of this species in this
-        <name path="parent::*" />
-        element.
+        There are more than two <name /> elements of this species in this <name path="parent::*" /> element.
       </report>
       <assert test="not(count(parent::*/ark:animal[ark:species=$animalSpecies]) &lt; 2)">
-        There is no further
-        <name />
-        element of this species in this
-        <name path="parent::*" />
-        element.
+        There is no further <name /> element of this species in this <name path="parent::*" /> element.
       </assert>
     </rule>
   </pattern>
@@ -125,9 +117,7 @@
   <pattern id="value-of">
     <rule context="ark:animal">
       <report test="count(parent::*/ark:animal[ark:species=current()/ark:species]) &gt; 2">
-        There are more than two animals of this species in this accommodation (
-        <value-of select="ark:species" />
-        ).
+        There are more than two animals of this species in this accommodation (<value-of select="ark:species" />).
       </report>
     </rule>
   </pattern>

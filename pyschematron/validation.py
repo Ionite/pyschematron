@@ -17,16 +17,36 @@ class ValidationContext(object):
         self.add_variables(schema.variables)
 
     def set_pattern(self, pattern):
+        """
+        Set the context pattern. This also adds the pattern variables to the context
+        :param pattern: The pattern to set
+        :return:
+        """
         self.pattern = pattern
         self.add_variables(pattern.variables)
 
     def set_rule(self, rule):
+        """
+        Set the context rule. This DOES NOT add the rule variables to the context.
+        That is done with a separate call to add_rule_variables(), as we need the document elements
+        that match the rule's context to correctly evaluate the variable's value.
+        :param rule:
+        :return:
+        """
         self.rule = rule
-        self.add_variables(rule.variables)
 
-    def add_variables(self, variables):
+    # Special case for adding variables: within rules,
+    # we have to use the context of the rule
+    def add_rule_variables(self, rule, element):
+        for name, value in rule.variables.items():
+            self.variables[name] = self.schema.query_binding.interpret_let_statement(self.xml_doc, value, self.schema.ns_prefixes, self.variables, context_item=element)
+
+    # General case for adding variables
+    def add_variables(self, variables, element=None):
         for name, value in variables.items():
-            if name in self.variables:
+            # Disallow multiple declarations of the same variables,
+            # except in the case of rules
+            if element is None and name in self.variables:
                 raise SchematronError("Variable %s is declared multiple times within the same context" % name)
             self.variables[name] = self.schema.query_binding.interpret_let_statement(self.xml_doc, value, self.schema.ns_prefixes, self.variables)
 
@@ -74,6 +94,7 @@ class ValidationContext(object):
                 if assert_test.id:
                     self.msg(5, "Id: " + assert_test.id)
                 self.msg(5, "Test: '%s'" % assert_test.test)
+                self.msg(5, "Initial text: '%s'" % assert_test.text)
                 self.msg(5, "Result: %s" % str(result))
 
                 report.add_failed_assert(self, assert_test, element)

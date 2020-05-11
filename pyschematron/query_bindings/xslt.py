@@ -54,11 +54,10 @@ class XSLTBinding(object):
     def find_all(self, xml_document, context, namespaces, variables):
         return xml_document.findall(context, namespaces=namespaces, **variables)
 
-    def parse_expression(self, xml_document, expression, namespaces, variables):
-        #parser = XPath1Parser(namespaces, variables)
+    def parse_expression(self, xml_document, expression, namespaces, variables, context_item=None):
         parser = XSLT1Parser(namespaces, variables)
         root_node = parser.parse(expression)
-        context = XPathContextXSLT(root=xml_document)
+        context = XPathContextXSLT(root=xml_document, item=context_item)
         result = root_node.evaluate(context)
         return result
 
@@ -97,5 +96,5 @@ class XSLTBinding(object):
         result = root_token.evaluate(context=context)
         return result
 
-    def interpret_let_statement(self, xml_document, value, namespaces, variables):
-        return self.parse_expression(xml_document, value, namespaces, variables)
+    def interpret_let_statement(self, xml_document, value, namespaces, variables, context_item=None):
+        return self.parse_expression(xml_document, value, namespaces, variables, context_item)
