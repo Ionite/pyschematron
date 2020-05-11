@@ -34,9 +34,9 @@ def main():
         errors.extend(error_list)
 
     if args.verbosity > 0:
-        for error in errors:
+        for error, element in errors:
             print("Error: %s" % error.text)
-            print("ErrorToString: %s" % error.to_string(resolve=True, doc, error.xxxx))
+            print("ErrorToString: %s" % error.to_string(resolve=True, xml_doc=doc, current_element=element, namespaces=schema.ns_prefixes))
             for d_id in error.diagnostic_ids:
                 if d_id in error.rule.pattern.schema.diagnostics:
                     print("Proposal for solution: %s" % error.rule.pattern.schema.diagnostics[d_id].text)

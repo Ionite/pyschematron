@@ -8,6 +8,9 @@ import re
 from collections import OrderedDict
 from lxml import etree
 
+from elementpath import xpath_context
+from elementpath import XPath2Parser
+
 from pyschematron.exceptions import *
 from pyschematron.util import WorkingDirectory, abstract_replace_vars
 from pyschematron.query_bindings import xslt, xslt2, xpath2
@@ -59,11 +62,11 @@ class ComplexText(object):
         for child in element.getchildren():
             self.from_xml_child(child)
 
-    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+    def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
         result = []
         print("[XX] TO STRING CALLED ON ComplexText! (%d parts)" % len(self.parts))
         for part in self.parts:
-            result.append(part.to_string(resolve, xml_doc, current_element))
+            result.append(part.to_string(resolve, xml_doc, current_element, namespaces))
         return "".join(result)
 
     def to_xsl(self):
@@ -767,10 +770,10 @@ class TextElement(object):
         for child in element.getchildren():
             self.from_xml_child(child)
 
-    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+    def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
         result = []
         for part in self.parts:
-            result.append(part.to_string(resolve, xml_doc, current_element))
+            result.append(part.to_string(resolve, xml_doc, current_element, namespaces))
         return "".join(result)
 
 
@@ -779,7 +782,7 @@ class BasicText:
     def __init__(self, text):
         self.text = text
 
-    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+    def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
         return self.text
 
 
@@ -788,9 +791,19 @@ class NameText(object):
     def __init__(self, xml_element):
         self.path = xml_element.attrib.get('path')
 
-    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+    def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
         if resolve:
-            raise Exception("TODO")
+            #xxxxxxxxxxxxxxx shit i need querybinding too i think, or can we directly use elementpath?
+            #hint: axis?
+            from elementpath import select
+            parser = XPath2Parser()
+            xpc = xpath_context.XPathContext(xml_doc, item=current_element)
+            root_node = parser.parse("name(%s)" % (self.path or "."))
+            result = root_node.evaluate(xpc)
+            # Remove namespace (should we?)
+            if result.find('}') >= 0:
+                result = result[result.find('}')+1:]
+            return result
         else:
             path_attr = ""
             if self.path is not None:
@@ -803,9 +816,14 @@ class ValueOfText(object):
     def __init__(self, xml_element):
         self.select = xml_element.attrib.get('select')
 
-    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+    def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
         if resolve:
-            raise Exception("TODO")
+            print(namespaces)
+            parser = XPath2Parser(namespaces=namespaces)
+            xpc = xpath_context.XPathContext(xml_doc, item=current_element)
+            root_node = parser.parse("string(%s)" % (self.select or "."))
+            result = root_node.evaluate(xpc)
+            return result
         else:
             select_attr = ""
             if self.select is not None:
@@ -827,7 +845,7 @@ class SimpleText(object):
             raise Exception("base class SimpleText should not be instantiated directly")
         self.text = xml_element.text
 
-    def to_string(self, resolve=False, xml_doc=None, current_element=None):
+    def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
         return self.text
 
     def to_xsl(self):
