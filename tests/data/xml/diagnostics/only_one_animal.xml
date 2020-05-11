@@ -1,0 +1,9 @@
+<ark xmlns="http://www.schematron.info/arche">
+  <room>
+    <animal sex="female" carnivore="yes">
+      <species>lion</species>
+      <weight>200</weight>
+      <age>30</age>
+    </animal>
+  </room>
+</ark>
