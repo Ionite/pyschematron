@@ -35,16 +35,18 @@ def main():
 
     if args.verbosity > 0:
         for error, element in errors:
-            print("Error: %s" % error.text)
-            print("ErrorToString: %s" % error.to_string(resolve=True, xml_doc=doc, current_element=element, namespaces=schema.ns_prefixes))
+            #print("Error: %s" % error.text)
+            print("Error: %s" % error.to_string(resolve=True, xml_doc=doc, current_element=element, namespaces=schema.ns_prefixes))
             for d_id in error.diagnostic_ids:
                 if d_id in error.rule.pattern.schema.diagnostics:
                     print("Proposal for solution: %s" % error.rule.pattern.schema.diagnostics[d_id].text)
-        for warning in warnings:
-            print("Warning: %s" % warning.text)
-            for d_id in error.diagnostic_ids:
-                if d_id in error.rule.pattern.schema.diagnostics:
-                    print("Proposal for solution: %s" % error.rule.pattern.schema.diagnostics[d_id].text)
+        for warning, element in warnings:
+            #print("Warning: %s" % warning.text)
+            print("Warning: %s" % warning.to_string(resolve=True, xml_doc=doc, current_element=element, namespaces=schema.ns_prefixes))
+
+            for d_id in warning.diagnostic_ids:
+                if d_id in warning.rule.pattern.schema.diagnostics:
+                    print("Proposal for solution: %s" % warning.rule.pattern.schema.diagnostics[d_id].text)
 
     if args.verbosity > 0:
         print("File: %s" % args.xml_file)
