@@ -65,6 +65,20 @@ class ComplexText(object):
         for child in element.getchildren():
             self.from_xml_child(child)
 
+    def to_minimal_xml(self):
+        element = xml_util.create(self.NAME)
+        subelement = None
+        for part in self.parts:
+            if isinstance(part, BasicText):
+                if subelement is None:
+                    element.text = part.to_string()
+                else:
+                    subelement.tail = part.to_string()
+            else:
+                subelement = part.to_minimal_xml()
+                element.append(subelement)
+        return element
+
     def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
         result = []
         for part in self.parts:
@@ -633,7 +647,8 @@ class RuleTest(ComplexText):
         self.id = None
         self.test = None
         self.flag = None
-        self.text = None
+        # TODO: remove self.text
+        #self.text = None
         self.diagnostic_ids = []
 
         self.rule = rule
@@ -645,17 +660,16 @@ class RuleTest(ComplexText):
         self.test = a_element.attrib['test']
         if 'id' in a_element.attrib:
             self.id = a_element.attrib['id']
-        if a_element.text is not None:
-            self.text = a_element.text.strip()
-            self.new_text = TextElement(a_element)
+        #if a_element.text is not None:
+        #    self.text = a_element.text.strip()
+        #    self.new_text = TextElement(a_element)
         if 'diagnostics' in a_element.attrib:
             self.diagnostic_ids = re.split("\s+", a_element.attrib['diagnostics'])
 
     def to_minimal_xml(self):
-        element = xml_util.create('assert')
+        element = super().to_minimal_xml()
         xml_util.set_attr(element, 'test', self.test)
         xml_util.set_attr(element, 'flag', self.flag)
-        xml_util.set_attr(element, 'text', self.text)
         return element
 
     def get_diagnostic(self, diagnostic_id):
@@ -681,17 +695,24 @@ class Assertion(RuleTest):
 class Report(RuleTest):
     NAME = 'report'
 
+    def to_assert(self):
+        """
+        Returns a clone of this Report as an Assert, with the test member inverted
+        :return:
+        """
+        assertion = Assertion(self.rule)
+        assertion.__dict__.update(self.__dict__)
+        assertion.test = "not(%s)" % self.test
+        return assertion
+
     def to_minimal_xml(self):
         """
         This inverts the statement of the report, and returns the result as
         an <assert> xml element, as per specification section 6.2
         :return: An <assert> xml Element
         """
-        element = xml_util.create('assert')
-        xml_util.set_attr(element, 'test', "not(%s)" % self.test)
-        xml_util.set_attr(element, 'flag', self.flag)
-        xml_util.set_attr(element, 'text', self.text)
-        return element
+        assertion = self.to_assert()
+        return assertion.to_minimal_xml()
 
 
 class Diagnostics(object):
@@ -773,6 +794,7 @@ class TextElement(object):
         for child in element.getchildren():
             self.from_xml_child(child)
 
+
     def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
         result = []
         for part in self.parts:
@@ -796,9 +818,8 @@ class NameText(object):
 
     def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
         if resolve:
-            #xxxxxxxxxxxxxxx shit i need querybinding too i think, or can we directly use elementpath?
-            #hint: axis?
-            from elementpath import select
+            # TODO: we should really pass the query_binding here, as those would contain
+            # the best implementation of this specific call
             parser = XPath2Parser()
             xpc = xpath_context.XPathContext(xml_doc, item=current_element)
             root_node = parser.parse("name(%s)" % (self.path or "."))
@@ -813,6 +834,12 @@ class NameText(object):
                 path_attr = 'path="%s" ' % self.path
             return "<name %s/>" % path_attr
 
+    def to_minimal_xml(self):
+        element = xml_util.create('name')
+        if self.path is not None:
+            element.attrib['path'] = self.path
+        return element
+
 
 class ValueOfText(object):
     """The <value-of> objects"""
@@ -820,6 +847,8 @@ class ValueOfText(object):
         self.select = xml_element.attrib.get('select')
 
     def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
+        # TODO: we should really pass the query_binding here, as those would contain
+        # the best implementation of this specific call
         if resolve:
             parser = XPath2Parser(namespaces=namespaces)
             xpc = xpath_context.XPathContext(xml_doc, item=current_element)
@@ -831,6 +860,12 @@ class ValueOfText(object):
             if self.select is not None:
                 select_attr = 'select="%s" ' % self.select
             return "<value-of %s/>" % select_attr
+
+    def to_minimal_xml(self):
+        element = xml_util.create('value-of')
+        if self.select is not None:
+            element.attrib['select'] = self.select
+        return element
 
 
 class TitleText(ComplexText):

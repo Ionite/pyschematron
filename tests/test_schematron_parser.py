@@ -121,7 +121,7 @@ class TestParseSchematron(unittest.TestCase):
                     for a in r.assertions:
                         root_token = parser.parse(a.test)
                         result = root_token.evaluate(context)
-                        self.assertTrue(result, a.text)
+                        self.assertTrue(result, a.to_string())
 
     def test_unknown_querybinding(self):
         self.assertRaises(SchematronNotImplementedError, Schema, get_file("schematron", "unknown_querybinding.sch"))
@@ -335,12 +335,12 @@ class ValidateSchematronFiles(unittest.TestCase):
             # These wouldn't even pass our own parsing, to read them directly
             xml_doc = etree.parse(get_file("schematron", filename))
             report = self.schema.validate_document(xml_doc)
-            self.assertNotEqual([], report.get_failed_asserts(), [a.text for a,element in report.get_failed_asserts()])
+            self.assertNotEqual([], report.get_failed_asserts(), [a.to_string() for a,element in report.get_failed_asserts()])
 
         for filename in ['malformed/bad_active_pattern.sch']:
             xml_doc = self.get_schematron_minimal_xml(filename)
             report = self.schema.validate_document(xml_doc)
-            self.assertNotEqual([], report.get_failed_asserts(), [a.text for a,element in report.get_failed_asserts()])
+            self.assertNotEqual([], report.get_failed_asserts(), [a.to_string() for a,element in report.get_failed_asserts()])
 
 class TestDiagnostics(unittest.TestCase):
     def test_simple_diagnostics(self):

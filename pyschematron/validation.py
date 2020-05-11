@@ -94,7 +94,7 @@ class ValidationContext(object):
                 if assert_test.id:
                     self.msg(5, "Id: " + assert_test.id)
                 self.msg(5, "Test: '%s'" % assert_test.test)
-                self.msg(5, "Initial text: '%s'" % assert_test.text)
+                self.msg(5, "Initial text: '%s'" % assert_test.to_string())
                 self.msg(5, "Result: %s" % str(result))
 
                 report.add_failed_assert(self, assert_test, element)
