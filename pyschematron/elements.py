@@ -192,7 +192,7 @@ class Schema(object):
             # in the same way as the skeleton implementation does
             if self.element_number_of_first_pattern is None:
                 self.element_number_of_first_pattern = self.elements_read
-            pattern = Pattern(self, self, element)
+            pattern = Pattern(self, element)
             if pattern.id == '':
                 pattern.id = "#%d" % len(self.patterns)
             if pattern.id in self.patterns:
@@ -473,8 +473,7 @@ class Phase(SchemaObject):
 
 
 class Pattern(SchemaObject):
-    # TODO: after schemaobject/parent is done, we can remove schema here
-    def __init__(self, parent, schema, xml_element=None):
+    def __init__(self, parent, xml_element=None):
         super().__init__(parent)
 
         # Specification properties (attributes)
@@ -495,9 +494,6 @@ class Pattern(SchemaObject):
         self.params = {}
         # <include> files are handled directly
 
-        # Implementation properties
-        self.schema = schema
-
         if xml_element is not None:
             self.from_xml(xml_element)
 
@@ -512,7 +508,7 @@ class Pattern(SchemaObject):
             p_value = element.attrib['value']
             self.variables[p_name] = p_value
         elif el_name == 'rule':
-            rule = Rule(self, self, element, self.variables)
+            rule = Rule(self, element, self.variables)
             self.rules.append(rule)
         elif el_name == 'param':
             p_name = element.attrib['name']
@@ -566,8 +562,7 @@ class Pattern(SchemaObject):
 
 
 class Rule(SchemaObject):
-    # TODO: after parent stuff is done, remove pattern here
-    def __init__(self, parent, pattern=None, xml_element=None, variables=None):
+    def __init__(self, parent, xml_element=None, variables=None):
         super().__init__(parent)
 
         self.flag = None
@@ -588,7 +583,6 @@ class Rule(SchemaObject):
         self.extends = []
         # includes are handled directly when parsing
 
-        self.pattern = pattern
         if xml_element is not None:
             self.from_xml(xml_element, variables)
 
@@ -600,7 +594,6 @@ class Rule(SchemaObject):
         new_rule.reports = self.reports[:]
         new_rule.variables = copy.deepcopy(self.variables)
         new_rule.abstract = self.abstract
-        new_rule.pattern = self.pattern
         return new_rule
 
     def _parse_xml_child(self, element, variables):
@@ -662,8 +655,8 @@ class RuleTest(ComplexText):
     for assertion or report messages.
     """
 
-    def __init__(self, rule, xml_element=None):
-        super().__init__(xml_element)
+    def __init__(self, parent, xml_element=None):
+        super().__init__(parent, xml_element)
         self.id = None
         self.test = None
         self.flag = None
@@ -671,7 +664,6 @@ class RuleTest(ComplexText):
         #self.text = None
         self.diagnostic_ids = []
 
-        self.rule = rule
         if xml_element is not None:
             self.from_xml(xml_element)
 
@@ -697,9 +689,9 @@ class RuleTest(ComplexText):
             return self.rule.pattern.schema.diagnostics[diagnostic_id]
 
     def get_diagnostic_text(self, diagnostic_id):
-        if diagnostic_id not in self.rule.get_schema().diagnostics:
+        if diagnostic_id not in self.get_schema().diagnostics:
             raise SchematronError("No diagnostic found with id %s" % diagnostic_id)
-        return self.rule.get_schema().diagnostics[diagnostic_id].to_string()
+        return self.get_schema().diagnostics[diagnostic_id].to_string()
         #if diagnostic_id in self.rule.pattern.schema.diagnostics:
         #    return self.rule.pattern.schema.diagnostics[diagnostic_id].text
 
@@ -723,7 +715,7 @@ class Report(RuleTest):
         Returns a clone of this Report as an Assert, with the test member inverted
         :return:
         """
-        assertion = Assertion(self.rule)
+        assertion = Assertion(self.parent)
         assertion.__dict__.update(self.__dict__)
         assertion.test = "not(%s)" % self.test
         return assertion

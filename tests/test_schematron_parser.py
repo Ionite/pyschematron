@@ -11,6 +11,7 @@ from pyschematron.elementpath_extensions.xslt2_parser import XSLT2Parser
 from pyschematron.elementpath_extensions.select import select_with_context
 from pyschematron.elements import Schema
 from pyschematron.exceptions import *
+from pyschematron.commands import validate
 
 BASE_DIR = os.path.abspath("%s/../../" % __file__)
 
@@ -172,7 +173,7 @@ class TestRuleOrder(unittest.TestCase):
         xml_doc = etree.ElementTree(etree.XML(xml_string))
         report = schema.validate_document(xml_doc)
         errors = report.get_failed_asserts()
-        error_ruleid_list = [err.rule.id for err,element in errors]
+        error_ruleid_list = [err.parent.id for err,element in errors]
         return error_ruleid_list
 
     def check_rule_order(self, schematron_file):
@@ -359,6 +360,12 @@ class TestAllElements(unittest.TestCase):
 
     def test_setup(self):
         pass
+
+
+class TestValidateCommand(unittest.TestCase):
+    def test_validate(self):
+        validate.main("data/schematron/all_elements.sch", "data/xml/diagnostics/more_than_three_animals.xml", verbosity=0)
+        #validate.main("data/schematron/all_elements.sch", "data/xml/diagnostics/more_than_three_animals.xml", verbosity=1)
 
 if __name__ == '__main__':
     unittest.main()
