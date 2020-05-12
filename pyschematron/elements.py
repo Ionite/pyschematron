@@ -841,15 +841,13 @@ class NameText(SchemaObject):
 
     def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
         if resolve:
-            # TODO: we should really pass the query_binding here, as those would contain
-            # the best implementation of this specific call
-            parser = XPath2Parser()
-            xpc = xpath_context.XPathContext(xml_doc, item=current_element)
-            root_node = parser.parse("name(%s)" % (self.path or "."))
-            result = root_node.evaluate(xpc)
-            # Remove namespace (should we?)
+            qb = self.get_schema().query_binding
+            result = qb.evaluate_name_query(xml_doc, current_element, namespaces, {}, "name(%s)" % (self.path or "."))
+            # TODO: *should* we remove namespaces?
             if result.find('}') >= 0:
                 result = result[result.find('}')+1:]
+            if result.find(':') >= 0:
+                result = result[result.find(':')+1:]
             return result
         else:
             path_attr = ""
@@ -871,13 +869,14 @@ class ValueOfText(SchemaObject):
         self.select = xml_element.attrib.get('select')
 
     def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
-        # TODO: we should really pass the query_binding here, as those would contain
-        # the best implementation of this specific call
         if resolve:
-            parser = XPath2Parser(namespaces=namespaces)
-            xpc = xpath_context.XPathContext(xml_doc, item=current_element)
-            root_node = parser.parse("string(%s)" % (self.select or "."))
-            result = root_node.evaluate(xpc)
+            qb = self.get_schema().query_binding
+            result = qb.evaluate_value_of_query(xml_doc, current_element, namespaces, {}, "name(%s)" % (self.select or "."))
+            # TODO: *should* we remove namespaces?
+            if result.find('}') >= 0:
+                result = result[result.find('}')+1:]
+            if result.find(':') >= 0:
+                result = result[result.find(':')+1:]
             return result
         else:
             select_attr = ""
