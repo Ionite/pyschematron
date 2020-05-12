@@ -348,7 +348,6 @@ class TestDiagnostics(unittest.TestCase):
         xml_doc = etree.parse(get_file("xml", "diagnostics/more_than_three_animals.xml"))
         report = schema.validate_document(xml_doc)
 
-        print(report.get_failed_asserts())
         self.assertEqual(3, len(report.get_failed_asserts()))
         self.assertEqual(1, len(report.get_failed_asserts()[0][0].diagnostic_ids))
         self.assertEqual("""Noah, you must remove as many animals from the ark so that

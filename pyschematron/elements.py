@@ -36,13 +36,14 @@ class SchemaObject(object):
             parent = parent.parent
         return parent
 
-class ComplexText(object):
+class ComplexText(SchemaObject):
     """
     Base class for elements that contain text elements, e.g. <p>, or <assert>
     This class that must be instantiated through other classes
     """
 
-    def __init__(self, xml_element=None):
+    def __init__(self, parent, xml_element=None):
+        super().__init__(parent)
         if not hasattr(self, 'NAME'):
             raise Exception("base class ComplexText should not be instantiated directly")
 
@@ -53,26 +54,26 @@ class ComplexText(object):
     def from_xml_child(self, element):
         el_name = etree.QName(element.tag).localname
         if el_name == 'span':
-            self.parts.append(SpanText(element))
+            self.parts.append(SpanText(self, element))
         elif el_name == 'emph':
-            self.parts.append(EmphText(element))
+            self.parts.append(EmphText(self, element))
         elif el_name == 'dir':
-            self.parts.append(DirText(element))
+            self.parts.append(DirText(self, element))
         elif el_name == 'name':
-            self.parts.append(NameText(element))
+            self.parts.append(NameText(self, element))
         elif el_name == 'value-of':
-            self.parts.append(ValueOfText(element))
+            self.parts.append(ValueOfText(self, element))
         else:
             raise SchematronError("TODO: \"%s\"" % el_name)
         if element.tail is not None:
-            self.parts.append(BasicText(element.tail))
+            self.parts.append(BasicText(self, element.tail))
 
     def from_xml(self, element):
         if len(self.parts) > 0:
             #raise SchematronError("from_xml already called")
             return
         if element.text:
-            self.parts.append(BasicText(element.text))
+            self.parts.append(BasicText(self, element.text))
         for child in element.getchildren():
             self.from_xml_child(child)
 
@@ -149,6 +150,7 @@ class Schema(object):
         #
         # Implementation properties
         #
+        self.parent = None
         self.file_path = None
         self.verbosity = verbosity
         self.abstract_patterns_processed = False
@@ -190,14 +192,14 @@ class Schema(object):
             # in the same way as the skeleton implementation does
             if self.element_number_of_first_pattern is None:
                 self.element_number_of_first_pattern = self.elements_read
-            pattern = Pattern(self, element)
+            pattern = Pattern(self, self, element)
             if pattern.id == '':
                 pattern.id = "#%d" % len(self.patterns)
             if pattern.id in self.patterns:
                 raise SchematronError("Duplicate pattern id: %s" % pattern.id)
             self.patterns[pattern.id] = pattern
         elif el_name == 'phase':
-            phase = Phase(element)
+            phase = Phase(self, element)
             self.phases[phase.id] = phase
         elif el_name == 'include':
             href = element.attrib['href']
@@ -205,11 +207,11 @@ class Schema(object):
             with WorkingDirectory(os.path.dirname(os.path.abspath(href))):
                 self._parse_xml_child(included_doc.getroot())
         elif el_name == 'p':
-            self.paragraphs.append(ParagraphText(element))
+            self.paragraphs.append(ParagraphText(self, element))
         elif el_name == 'diagnostics':
             if self.diagnostics is not None:
                 raise SchematronError("diagnostics element can only occur once per schema or pattern")
-            self.diagnostics = Diagnostics(element)
+            self.diagnostics = Diagnostics(self, element)
         else:
             raise SchematronError("Unknown element in schema: %s" % element.tag)
         self.elements_read += 1
@@ -411,8 +413,9 @@ class Schema(object):
         return report
 
 
-class Phase(object):
-    def __init__(self, xml_element=None):
+class Phase(SchemaObject):
+    def __init__(self, parent, xml_element=None):
+        super().__init__(parent)
         self.id = None
         self.icon = None
         self.see = None
@@ -469,8 +472,11 @@ class Phase(object):
         return element
 
 
-class Pattern(object):
-    def __init__(self, schema, xml_element=None):
+class Pattern(SchemaObject):
+    # TODO: after schemaobject/parent is done, we can remove schema here
+    def __init__(self, parent, schema, xml_element=None):
+        super().__init__(parent)
+
         # Specification properties (attributes)
         self.abstract = False
         self.is_a = None
@@ -506,7 +512,7 @@ class Pattern(object):
             p_value = element.attrib['value']
             self.variables[p_name] = p_value
         elif el_name == 'rule':
-            rule = Rule(self, element, self.variables)
+            rule = Rule(self, self, element, self.variables)
             self.rules.append(rule)
         elif el_name == 'param':
             p_name = element.attrib['name']
@@ -559,8 +565,11 @@ class Pattern(object):
         raise SchematronError("Error: unknown rule with id '%s'" % id)
 
 
-class Rule(object):
-    def __init__(self, pattern=None, xml_element=None, variables=None):
+class Rule(SchemaObject):
+    # TODO: after parent stuff is done, remove pattern here
+    def __init__(self, parent, pattern=None, xml_element=None, variables=None):
+        super().__init__(parent)
+
         self.flag = None
         self.abstract = False
         self.context = None
@@ -584,7 +593,7 @@ class Rule(object):
             self.from_xml(xml_element, variables)
 
     def copy(self):
-        new_rule = Rule()
+        new_rule = Rule(self.parent)
         new_rule.context = self.context
         new_rule.id = self.id
         new_rule.assertions = self.assertions[:]
@@ -688,8 +697,11 @@ class RuleTest(ComplexText):
             return self.rule.pattern.schema.diagnostics[diagnostic_id]
 
     def get_diagnostic_text(self, diagnostic_id):
-        if diagnostic_id in self.rule.pattern.schema.diagnostics:
-            return self.rule.pattern.schema.diagnostics[diagnostic_id].text
+        if diagnostic_id not in self.rule.get_schema().diagnostics:
+            raise SchematronError("No diagnostic found with id %s" % diagnostic_id)
+        return self.rule.get_schema().diagnostics[diagnostic_id].to_string()
+        #if diagnostic_id in self.rule.pattern.schema.diagnostics:
+        #    return self.rule.pattern.schema.diagnostics[diagnostic_id].text
 
 
 class Assertion(RuleTest):
@@ -726,8 +738,10 @@ class Report(RuleTest):
         return assertion.to_minimal_xml()
 
 
-class Diagnostics(object):
-    def __init__(self, xml_element=None):
+class Diagnostics(SchemaObject):
+    def __init__(self, parent, xml_element=None):
+        super().__init__(parent)
+
         self.diagnostics = {}
         if xml_element is not None:
             self.from_xml(xml_element)
@@ -739,7 +753,7 @@ class Diagnostics(object):
                 continue
             el_name = etree.QName(element.tag).localname
             if el_name == 'diagnostic':
-                diagnostic = Diagnostic(element)
+                diagnostic = Diagnostic(self, element)
                 self.diagnostics[diagnostic.id] = diagnostic
             else:
                 raise SchematronError("Unknown element in diagnostics element: %s" % (element.tag))
@@ -751,8 +765,10 @@ class Diagnostics(object):
         return self.diagnostics[key]
 
 
-class Diagnostic(object):
-    def __init__(self, xml_element=None):
+class Diagnostic(ComplexText):
+    NAME = 'diagnostic'
+    def __init__(self, parent, xml_element=None):
+        super().__init__(parent, xml_element)
         self.id = None
         self.language = None
         self.text = None
@@ -761,20 +777,22 @@ class Diagnostic(object):
             self.from_xml(xml_element)
 
     def from_xml(self, element):
+        super().from_xml(element)
         self.id = element.attrib['id']
         self.language = element.attrib.get('{http://www.w3.org/XML/1998/namespace}lang')
         self.text = element.text
-        self.new_text = TextElement(element)
+        self.new_text = TextElement(self, element)
 
 
-class TextElement(object):
+class TextElement(SchemaObject):
     """Contains the text part of objects like Assertion and Report
 
     These text parts can themselves contain XML elements such as <emph> or <value-of>, so this class keeps a list of the individual parts
     that make a text section.
     """
 
-    def __init__(self, xml_element=None):
+    def __init__(self, parent, xml_element=None):
+        super().__init__(parent)
         self.parts = []
 
         if xml_element is not None:
@@ -783,25 +801,25 @@ class TextElement(object):
     def from_xml_child(self, element):
         el_name = etree.QName(element.tag).localname
         if el_name == 'name':
-            self.parts.append(NameText(element))
+            self.parts.append(NameText(self, element))
         elif el_name == 'p':
-            self.parts.append(ParagraphText(element))
+            self.parts.append(ParagraphText(self, element))
         elif el_name == 'value-of':
-            self.parts.append(ValueOfText(element))
+            self.parts.append(ValueOfText(self, element))
         elif el_name == 'span':
-            self.parts.append(SpanText(element))
+            self.parts.append(SpanText(self, element))
         elif el_name == 'emph':
-            self.parts.append(EmphText(element))
+            self.parts.append(EmphText(self, element))
         elif el_name == 'dir':
-            self.parts.append(DirText(element))
+            self.parts.append(DirText(self, element))
         else:
             raise SchematronError("TODO: '%s'" % el_name)
         if element.tail is not None:
-            self.parts.append(BasicText(element.tail))
+            self.parts.append(BasicText(self, element.tail))
 
     def from_xml(self, element):
         if element.text:
-            self.parts.append(BasicText(element.text))
+            self.parts.append(BasicText(self, element.text))
         for child in element.getchildren():
             self.from_xml_child(child)
 
@@ -813,18 +831,20 @@ class TextElement(object):
         return "".join(result)
 
 
-class BasicText:
+class BasicText(SchemaObject):
     """XML text without an element (e.g. _Element.text or _Element.tail)"""
-    def __init__(self, text):
+    def __init__(self, parent, text):
+        super().__init__(parent)
         self.text = text
 
     def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
         return self.text
 
 
-class NameText(object):
+class NameText(SchemaObject):
     """The <name> objects"""
-    def __init__(self, xml_element):
+    def __init__(self, parent, xml_element):
+        super().__init__(parent)
         self.path = xml_element.attrib.get('path')
 
     def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
@@ -852,9 +872,10 @@ class NameText(object):
         return element
 
 
-class ValueOfText(object):
+class ValueOfText(SchemaObject):
     """The <value-of> objects"""
-    def __init__(self, xml_element):
+    def __init__(self, parent, xml_element):
+        super().__init__(parent)
         self.select = xml_element.attrib.get('select')
 
     def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
@@ -887,8 +908,9 @@ class ParagraphText(ComplexText):
     NAME = 'p'
     ALLOWED_CHILDREN = [ 'span', 'emph', 'dir' ]
 
-class SimpleText(object):
-    def __init__(self, xml_element):
+class SimpleText(SchemaObject):
+    def __init__(self, parent, xml_element):
+        super().__init__(parent)
         if not hasattr(self, 'NAME'):
             raise Exception("base class SimpleText should not be instantiated directly")
         self.text = xml_element.text
