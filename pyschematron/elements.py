@@ -25,6 +25,17 @@ QUERY_BINDINGS = {
     'xpath2': xpath2
 }
 
+class SchemaObject(object):
+    def __init__(self, parent):
+        self.parent = parent
+
+    def get_schema(self):
+        """Return the top-level schema for this object"""
+        parent = self.parent
+        while parent.parent is not None:
+            parent = parent.parent
+        return parent
+
 class ComplexText(object):
     """
     Base class for elements that contain text elements, e.g. <p>, or <assert>
