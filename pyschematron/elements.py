@@ -17,6 +17,7 @@ from pyschematron.query_bindings import xslt, xslt2, xpath2
 from pyschematron.validation import ValidationContext, ValidationReport
 from pyschematron.xml import xml_util
 from pyschematron.xml.xsl_generator import E
+from pyschematron.svrl import *
 
 QUERY_BINDINGS = {
     'None': xslt,
@@ -413,6 +414,98 @@ class Schema(object):
         return report
 
 
+    def validate_document_to_svrl(self, xml_doc, phase="#DEFAULT"):
+        """
+        Validates the given xml document against this schematron schema.
+
+        :return: a tuple ([errors], [warnings])
+        """
+
+        if phase == "#DEFAULT":
+            phase = self.default_phase
+
+        svrl = SchematronOutput(title=self.title, phase=phase, schema_version=self.schema_version, namespaces=self.ns_prefixes)
+
+        patterns = self.get_patterns_for_phase(phase)
+
+        # Idea for performance improvement:
+        # - loop over the actual elements in the document
+        # - while this element is not 'known', process rules as already done,
+        #   but store a mapping of each element that is encountered in a rule context match to that rule
+        # - process assertions when the element is encountered, but stop the rule loop, and move on to the next element
+        # - if this element is already 'known', we can immediately process the assertions
+        # - if not, continue the processing of rules
+
+        schema_context = ValidationContext(self, xml_doc)
+        if phase != "#ALL":
+            schema_context.add_variables(self.phases[phase].variables)
+
+        for p in patterns:
+            self.msg(5, "Validating pattern: " + str(p.id))
+            # We track the fired rule for each element, since every document node should only have one rule
+            fired_rules = {}
+            # Variables themselves can be expressions,
+            # so we evaluate them here, and replace the originals
+            # with the result of the evaluation
+            pattern_context = schema_context.copy()
+            pattern_context.set_pattern(p)
+
+            # SVRL has 'role' in (active-)pattern but schematron does not? TODO: check this
+            active_pattern = ActivePattern(id=p.id, name=p.id, role=None)
+
+            for r in p.rules:
+                self.msg(5, "Validating rule with context: " + str(r.context))
+                if r.abstract:
+                    continue
+                rule_context = pattern_context.copy()
+
+                # TODO: should this be done for every matching element?
+                fired_rule = FiredRule(id=r.id, context=r.context, role=r.role, flag=r.flag)
+                rule_context.set_rule(r)
+
+                # If the context is the literal '/', pass 'None' as the context item to elementpath
+                elements = rule_context.get_rule_context_elements()
+                self.msg(5, "Number of matching elements: %s" % len(elements))
+
+                for element in elements:
+                    rule_context.add_rule_variables(r, element)
+                    if element in fired_rules:
+                        # Already matched a rule, skip this one
+                        continue
+                    # Mark this element as having fired a rule (so it can be skipped later, if
+                    # it matches other rules as well)
+                    fired_rules[element] = r.context
+
+                    for assert_test in r.assertions:
+                        result = self.query_binding.evaluate_assertion(xml_doc, element, self.ns_prefixes, rule_context.variables,
+                                                                              assert_test.test)
+                        if not result:
+                            report = FailedAssert(id=assert_test.id,
+                                                  location=xml_doc.getelementpath(element),
+                                                  test=assert_test.test,
+                                                  role=assert_test.role,
+                                                  flag=assert_test.flag)
+                            report.text = Text(assert_test.to_string())
+                            fired_rule.add_report(report)
+                            # TODO: location, and diagnostic_references
+                    for report_test in r.reports:
+                        result = self.query_binding.evaluate_assertion(xml_doc, element, self.ns_prefixes, rule_context.variables,
+                                                                              report_test.test)
+                        if result:
+                            report = SuccessfulReport(id=report_test.id,
+                                                      location=xml_doc.getelementpath(element),
+                                                      test=report_test.test,
+                                                      role=report_test.role,
+                                                      flag=report_test.flag)
+                            report.text = Text(report_test.to_string(resolve=True, xml_doc=xml_doc, current_element=element, namespaces=self.ns_prefixes))
+                            fired_rule.add_report(report)
+
+
+                active_pattern.add_fired_rule(fired_rule)
+            svrl.add_active_pattern(active_pattern)
+        return svrl
+
+
 class Phase(SchemaObject):
     def __init__(self, parent, xml_element=None):
         super().__init__(parent)
@@ -657,12 +750,17 @@ class RuleTest(ComplexText):
 
     def __init__(self, parent, xml_element=None):
         super().__init__(parent, xml_element)
-        self.id = None
         self.test = None
         self.flag = None
-        # TODO: remove self.text
-        #self.text = None
+        self.id = None
         self.diagnostic_ids = []
+        self.icon = None
+        self.see = None
+        self.fpi = None
+        self.xml_lang = None
+        self.xml_space = None
+        self.role = None
+        self.subject = None
 
         if xml_element is not None:
             self.from_xml(xml_element)
@@ -670,15 +768,21 @@ class RuleTest(ComplexText):
     def from_xml(self, a_element):
         super().from_xml(a_element)
         self.test = a_element.attrib['test']
-        if 'id' in a_element.attrib:
-            self.id = a_element.attrib['id']
-        #if a_element.text is not None:
-        #    self.text = a_element.text.strip()
-        #    self.new_text = TextElement(a_element)
+        self.flag = a_element.attrib.get('flag')
+        self.id = a_element.attrib.get('id')
         if 'diagnostics' in a_element.attrib:
             self.diagnostic_ids = re.split("\s+", a_element.attrib['diagnostics'])
+        self.icon = a_element.attrib.get('icon')
+        self.see = a_element.attrib.get('see')
+        self.fpi = a_element.attrib.get('fpi')
+        self.xml_lang = a_element.attrib.get('xml:lang')
+        self.xml_space = a_element.attrib.get('xml:space')
+        self.role = a_element.attrib.get('role')
+        self.subject = a_element.attrib.get('subject')
+
 
     def to_minimal_xml(self):
+        # TODO: which elements to add?
         element = super().to_minimal_xml()
         xml_util.set_attr(element, 'test', self.test)
         xml_util.set_attr(element, 'flag', self.flag)

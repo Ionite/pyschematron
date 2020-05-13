@@ -12,12 +12,12 @@ NS = {
 }
 
 
-def E(namespace, name, attrs=None, nsmap=None, child=None, text=None):
+def E(prefix, name, attrs=None, nsmap=None, child=None, text=None):
     _nsmap = copy.copy(NS)
     if nsmap is not None:
-        for prefix, namespace in nsmap.items():
-            _nsmap[prefix] = namespace
-    element = etree.Element("{%s}%s" % (_nsmap[namespace], name), nsmap=_nsmap)
+        for _prefix, _namespace in nsmap.items():
+            _nsmap[_prefix] = _namespace
+    element = etree.Element("{%s}%s" % (_nsmap[prefix], name), nsmap=_nsmap)
 
     if attrs is not None:
         for name, value in attrs.items():

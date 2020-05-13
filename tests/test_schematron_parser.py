@@ -12,6 +12,7 @@ from pyschematron.elementpath_extensions.select import select_with_context
 from pyschematron.elements import Schema
 from pyschematron.exceptions import *
 from pyschematron.commands import validate
+from pyschematron.svrl import SchematronOutput
 
 BASE_DIR = os.path.abspath("%s/../../" % __file__)
 
@@ -364,13 +365,40 @@ class TestAllElements(unittest.TestCase):
 
 class TestValidateCommand(unittest.TestCase):
     def test_validate(self):
-        result = validate.main("data/schematron/all_elements.sch", "data/xml/diagnostics/more_than_three_animals.xml", verbosity=0)
+        output = StringIO()
+        result = validate.main("data/schematron/all_elements.sch", "data/xml/diagnostics/more_than_three_animals.xml", verbosity=1)
         self.assertEqual(-1, result)
 
-        result = validate.main("data/schematron/advanced_text.sch", "data/xml/basic1_ok.xml", verbosity=0)
-        self.assertEqual(0, result)
+        #result = validate.main("data/schematron/advanced_text.sch", "data/xml/basic1_ok.xml", verbosity=0)
+        #self.assertEqual(0, result)
 
+        #output = StringIO()
+        #result = validate.main("data/schematron/diagnostics.sch", "data/xml/diagnostics/more_than_three_animals.xml", output_stream=output, verbosity=1)
+        #self.assertEqual(0, result)
         #validate.main("data/schematron/all_elements.sch", "data/xml/diagnostics/more_than_three_animals.xml", verbosity=1)
+
+    def test_validate_svrl(self):
+        result = validate.main("data/schematron/all_elements.sch", "data/xml/diagnostics/more_than_three_animals.xml", output_type='svrl', verbosity=0)
+        result = validate.main("data/schematron/all_elements.sch", "data/xml/diagnostics/more_than_three_animals.xml", output_type='svrl', phase='name', verbosity=0)
+        print(etree.tostring(result.to_xml(), pretty_print=True).decode('utf-8'))
+        #self.assertEqual(0, result)
+
+class TestSVRL(unittest.TestCase):
+
+    def test_sample(self):
+        xml_doc = etree.parse(get_file("svrl", "svrl_sample.xml"))
+        svrl = SchematronOutput(xml_element=xml_doc.getroot())
+        new_xml = svrl.to_xml()
+
+        xml_doc = etree.parse(get_file("svrl", "simple.xml"))
+        svrl = SchematronOutput(xml_element=xml_doc.getroot())
+        new_xml = svrl.to_xml()
+
+        xml_doc = etree.parse(get_file("svrl", "simple_2.xml"))
+        svrl = SchematronOutput(xml_element=xml_doc.getroot())
+        new_xml = svrl.to_xml()
+
+        print(etree.tostring(new_xml, pretty_print=True).decode('utf-8'))
 
 if __name__ == '__main__':
     unittest.main()
