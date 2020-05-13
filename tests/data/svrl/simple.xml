@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svrl:schematron-output xmlns:svrl="http://purl.oclc.org/dsdl/svrl"
+                        xmlns:iso="http://purl.oclc.org/dsdl/schematron"
+                        xmlns:ark="http://www.schematron.info/arche"
+                        xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                        xmlns:schold="http://www.ascc.net/xml/schematron"
+                        xmlns:xhtml="http://www.w3.org/1999/xhtml"
+                        schemaVersion=""
+                        title="Schematron for Noah"><!--   
+		   
+		   
+		 -->
+   <svrl:text>This Schematron schema shall help Noah to accommodate the right animals in the suitable environment.</svrl:text>
+   <svrl:ns-prefix-in-attribute-values prefix="ark" uri="http://www.schematron.info/arche"/>
+   <svrl:active-pattern document="" id="name" name="name"/>
+   <svrl:fired-rule context="ark:animal"/>
+   <svrl:failed-assert location="/*[local-name()='ark']/*[local-name()='room']/*[local-name()='animal']"
+                       test="not(count(parent::*/ark:animal[ark:species=$animalSpecies]) &lt; 2)">
+      <svrl:text>
+        There is no further animal element of this species in this room element.
+      </svrl:text>
+   </svrl:failed-assert>
+</svrl:schematron-output>
+
