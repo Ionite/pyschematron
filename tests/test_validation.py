@@ -19,9 +19,9 @@ class TestValidation(unittest.TestCase):
 
         report = schema.validate_document(xml_doc)
         errors = report.get_failed_asserts()
-        error_id_list = [err.id for err,element in errors if err.flag != 'warning']
+        error_id_list = [err.id for err, element in errors if err.flag != 'warning']
         warnings = report.get_failed_asserts()
-        warning_id_list = [w.id for w,element in warnings if w.flag == 'warning']
+        warning_id_list = [w.id for w, element in warnings if w.flag == 'warning']
         self.assertEqual(expected_errors, error_id_list)
         self.assertEqual(expected_warnings, warning_id_list)
 
@@ -59,7 +59,7 @@ class ValidateSchematronFiles(unittest.TestCase):
     def test_correct_schematrons(self):
         for filename in ['basic.sch',
                          'schematron.sch',
-                         #'unknown_querybinding.sch',
+                         # 'unknown_querybinding.sch',
                          'svrl.sch',
                          'full.sch'
                          ]:
@@ -72,9 +72,9 @@ class ValidateSchematronFiles(unittest.TestCase):
             # These wouldn't even pass our own parsing, to read them directly
             xml_doc = etree.parse(get_file("schematron", filename))
             report = self.schema.validate_document(xml_doc)
-            self.assertNotEqual([], report.get_failed_asserts(), [a.to_string() for a,element in report.get_failed_asserts()])
+            self.assertNotEqual([], report.get_failed_asserts(), [a.to_string() for a, element in report.get_failed_asserts()])
 
         for filename in ['malformed/bad_active_pattern.sch']:
             xml_doc = self.get_schematron_minimal_xml(filename)
             report = self.schema.validate_document(xml_doc)
-            self.assertNotEqual([], report.get_failed_asserts(), [a.to_string() for a,element in report.get_failed_asserts()])
+            self.assertNotEqual([], report.get_failed_asserts(), [a.to_string() for a, element in report.get_failed_asserts()])

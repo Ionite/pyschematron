@@ -1,9 +1,11 @@
 from elementpath.xpath1_parser import XPath1Parser, is_document_node
 
+
 class XSLT1Parser(XPath1Parser):
     SYMBOLS = XPath1Parser.SYMBOLS | {
         'current'
     }
+
 
 register = XSLT1Parser.register
 unregister = XSLT1Parser.unregister
@@ -16,6 +18,7 @@ function = XSLT1Parser.function
 
 register('current')
 
+
 @method(function('current', nargs=0))
 def select(self, context=None):
     if context is None:
@@ -24,5 +27,6 @@ def select(self, context=None):
         return [context.current_item]
     else:
         raise Exception("current() called in a context without an original context item")
+
 
 XSLT1Parser.build()

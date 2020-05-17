@@ -2,8 +2,8 @@ from lxml import etree
 from pyschematron.elements import Schema
 from pyschematron.xml.xsl_generator import schema_to_xsl
 
-def main(input_filename, output_stream, output_format):
 
+def main(input_filename, output_stream, output_format):
     schema = Schema()
     schema.read_from_file(input_filename)
     schema.process_abstract_patterns()
@@ -12,7 +12,7 @@ def main(input_filename, output_stream, output_format):
         xsl_root = schema_to_xsl(schema)
         # Normalization: put all namespaces at the top level
         full_nsmap = xsl_root.nsmap
-        #print(schema_to_xsl(schema))
+        # print(schema_to_xsl(schema))
 
         output_stream.write(etree.tostring(xsl_root, pretty_print=True, xml_declaration=True, encoding='utf-8').decode('utf-8'))
     elif output_format == 'minimal':

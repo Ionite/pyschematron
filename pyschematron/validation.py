@@ -3,10 +3,12 @@ from collections import OrderedDict
 
 from pyschematron.exceptions import SchematronError
 
+
 class ValidationContext(object):
     """
     Holds all the relevant data for an assertion or report to be validated
     """
+
     def __init__(self, schema, xml_doc):
         self.xml_doc = xml_doc
         self.variables = {}
@@ -42,7 +44,8 @@ class ValidationContext(object):
     # we have to use the context of the rule
     def add_rule_variables(self, rule, element):
         for name, value in rule.variables.items():
-            self.variables[name] = self.schema.query_binding.interpret_let_statement(self.xml_doc, value, self.schema.ns_prefixes, self.variables, context_item=element)
+            self.variables[name] = self.schema.query_binding.interpret_let_statement(self.xml_doc, value, self.schema.ns_prefixes, self.variables,
+                                                                                     context_item=element)
 
     # General case for adding variables
     def add_variables(self, variables, element=None):
@@ -86,7 +89,7 @@ class ValidationContext(object):
             self.msg(4, "Test context: %s" % str(rule.context))
             self.msg(4, "Test expression: %s" % assert_test.test)
             result = self.schema.query_binding.evaluate_assertion(self.xml_doc, element, self.schema.ns_prefixes, self.variables,
-                                                           assert_test.test)
+                                                                  assert_test.test)
             if not result:
                 self.msg(5, "Failed assertion")
                 self.msg(5, "Pattern: %s" % self.pattern.id)
@@ -134,11 +137,11 @@ class ValidationReport(object):
         self.fired_rules[rule_context] = []
 
     def add_failed_assert(self, rule_context, assertion, element):
-        if (assertion,element) not in self.fired_rules[rule_context]:
+        if (assertion, element) not in self.fired_rules[rule_context]:
             self.fired_rules[rule_context].append((assertion, element))
-    
+
     def add_successful_report(self, rule_context, report, element):
-        if (report,element) not in self.fired_rules[rule_context]:
+        if (report, element) not in self.fired_rules[rule_context]:
             self.fired_rules[rule_context].append((report, element))
 
     def get_failed_asserts(self):
@@ -160,7 +163,7 @@ class ValidationReport(object):
         """
         result = []
         for failed_asserts in self.fired_rules.values():
-            result.extend([fa for fa,el in failed_asserts if fa.flag == flag])
+            result.extend([fa for fa, el in failed_asserts if fa.flag == flag])
         return result
 
     def get_failed_asserts_by_flag(self, default_flag=None):

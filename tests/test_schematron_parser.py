@@ -46,7 +46,7 @@ class TestRuleOrder(unittest.TestCase):
         xml_doc = etree.ElementTree(etree.XML(xml_string))
         report = schema.validate_document(xml_doc)
         errors = report.get_failed_asserts()
-        error_ruleid_list = [err.parent.id for err,element in errors]
+        error_ruleid_list = [err.parent.id for err, element in errors]
         return error_ruleid_list
 
     def check_rule_order(self, schematron_file):
@@ -160,7 +160,8 @@ class TestDiagnostics(unittest.TestCase):
         self.assertEqual(3, len(report.get_failed_asserts()))
         self.assertEqual(1, len(report.get_failed_asserts()[0][0].diagnostic_ids))
         self.assertEqual("""Noah, you must remove as many animals from the ark so that
-      only two of one species live in this accommodation.""".strip(), report.get_failed_asserts()[0][0].get_diagnostic_text(report.get_failed_asserts()[0][0].diagnostic_ids[0]).strip())
+      only two of one species live in this accommodation.""".strip(),
+                         report.get_failed_asserts()[0][0].get_diagnostic_text(report.get_failed_asserts()[0][0].diagnostic_ids[0]).strip())
 
 
 if __name__ == '__main__':

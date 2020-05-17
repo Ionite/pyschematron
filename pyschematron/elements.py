@@ -26,6 +26,7 @@ QUERY_BINDINGS = {
     'xpath2': xpath2
 }
 
+
 class SchemaObject(object):
     def __init__(self, parent):
         self.parent = parent
@@ -36,6 +37,7 @@ class SchemaObject(object):
         while parent.parent is not None:
             parent = parent.parent
         return parent
+
 
 class ComplexText(SchemaObject):
     """
@@ -71,7 +73,7 @@ class ComplexText(SchemaObject):
 
     def from_xml(self, element):
         if len(self.parts) > 0:
-            #raise SchematronError("from_xml already called")
+            # raise SchematronError("from_xml already called")
             return
         if element.text:
             self.parts.append(BasicText(self, element.text))
@@ -113,7 +115,6 @@ class ComplexText(SchemaObject):
         return element
 
 
-
 class Schema(object):
     def __init__(self, filename=None, xml_element=None, verbosity=0):
         """
@@ -135,7 +136,6 @@ class Schema(object):
         self.schema_version = None
         self.query_binding_name = None
         self.query_binding = None
-
 
         # Specification properties (elements)
         self.title = None
@@ -413,7 +413,6 @@ class Schema(object):
 
         return report
 
-
     def validate_document_to_svrl(self, xml_doc, phase="#DEFAULT"):
         """
         Validates the given xml document against this schematron schema.
@@ -478,7 +477,7 @@ class Schema(object):
 
                     for assert_test in r.assertions:
                         result = self.query_binding.evaluate_assertion(xml_doc, element, self.ns_prefixes, rule_context.variables,
-                                                                              assert_test.test)
+                                                                       assert_test.test)
                         if not result:
                             report = FailedAssert(id=assert_test.id,
                                                   location=xml_doc.getelementpath(element),
@@ -490,7 +489,7 @@ class Schema(object):
                             # TODO: location, and diagnostic_references
                     for report_test in r.reports:
                         result = self.query_binding.evaluate_assertion(xml_doc, element, self.ns_prefixes, rule_context.variables,
-                                                                              report_test.test)
+                                                                       report_test.test)
                         if result:
                             report = SuccessfulReport(id=report_test.id,
                                                       location=xml_doc.getelementpath(element),
@@ -499,7 +498,6 @@ class Schema(object):
                                                       flag=report_test.flag)
                             report.text = Text(report_test.to_string(resolve=True, xml_doc=xml_doc, current_element=element, namespaces=self.ns_prefixes))
                             fired_rule.add_report(report)
-
 
                 active_pattern.add_fired_rule(fired_rule)
             svrl.add_active_pattern(active_pattern)
@@ -780,7 +778,6 @@ class RuleTest(ComplexText):
         self.role = a_element.attrib.get('role')
         self.subject = a_element.attrib.get('subject')
 
-
     def to_minimal_xml(self):
         # TODO: which elements to add?
         element = super().to_minimal_xml()
@@ -796,12 +793,13 @@ class RuleTest(ComplexText):
         if diagnostic_id not in self.get_schema().diagnostics:
             raise SchematronError("No diagnostic found with id %s" % diagnostic_id)
         return self.get_schema().diagnostics[diagnostic_id].to_string()
-        #if diagnostic_id in self.rule.pattern.schema.diagnostics:
+        # if diagnostic_id in self.rule.pattern.schema.diagnostics:
         #    return self.rule.pattern.schema.diagnostics[diagnostic_id].text
 
 
 class Assertion(RuleTest):
     NAME = 'assert'
+
     # Assert statements can have a flag attribute
     def from_xml(self, a_element):
         super().from_xml(a_element)
@@ -863,6 +861,7 @@ class Diagnostics(SchemaObject):
 
 class Diagnostic(ComplexText):
     NAME = 'diagnostic'
+
     def __init__(self, parent, xml_element=None):
         super().__init__(parent, xml_element)
         self.id = None
@@ -919,7 +918,6 @@ class TextElement(SchemaObject):
         for child in element.getchildren():
             self.from_xml_child(child)
 
-
     def to_string(self, resolve=False, xml_doc=None, current_element=None, namespaces=None):
         result = []
         for part in self.parts:
@@ -929,6 +927,7 @@ class TextElement(SchemaObject):
 
 class BasicText(SchemaObject):
     """XML text without an element (e.g. _Element.text or _Element.tail)"""
+
     def __init__(self, parent, text):
         super().__init__(parent)
         self.text = text
@@ -939,6 +938,7 @@ class BasicText(SchemaObject):
 
 class NameText(SchemaObject):
     """The <name> objects"""
+
     def __init__(self, parent, xml_element):
         super().__init__(parent)
         self.path = xml_element.attrib.get('path')
@@ -949,9 +949,9 @@ class NameText(SchemaObject):
             result = qb.evaluate_name_query(xml_doc, current_element, namespaces, {}, "name(%s)" % (self.path or "."))
             # TODO: *should* we remove namespaces?
             if result.find('}') >= 0:
-                result = result[result.find('}')+1:]
+                result = result[result.find('}') + 1:]
             if result.find(':') >= 0:
-                result = result[result.find(':')+1:]
+                result = result[result.find(':') + 1:]
             return result
         else:
             path_attr = ""
@@ -968,6 +968,7 @@ class NameText(SchemaObject):
 
 class ValueOfText(SchemaObject):
     """The <value-of> objects"""
+
     def __init__(self, parent, xml_element):
         super().__init__(parent)
         self.select = xml_element.attrib.get('select')
@@ -978,9 +979,9 @@ class ValueOfText(SchemaObject):
             result = qb.evaluate_value_of_query(xml_doc, current_element, namespaces, {}, "name(%s)" % (self.select or "."))
             # TODO: *should* we remove namespaces?
             if result.find('}') >= 0:
-                result = result[result.find('}')+1:]
+                result = result[result.find('}') + 1:]
             if result.find(':') >= 0:
-                result = result[result.find(':')+1:]
+                result = result[result.find(':') + 1:]
             return result
         else:
             select_attr = ""
@@ -997,11 +998,13 @@ class ValueOfText(SchemaObject):
 
 class TitleText(ComplexText):
     NAME = 'title'
-    ALLOWED_CHILDREN = [ 'dir' ]
+    ALLOWED_CHILDREN = ['dir']
+
 
 class ParagraphText(ComplexText):
     NAME = 'p'
-    ALLOWED_CHILDREN = [ 'span', 'emph', 'dir' ]
+    ALLOWED_CHILDREN = ['span', 'emph', 'dir']
+
 
 class SimpleText(SchemaObject):
     def __init__(self, parent, xml_element):
@@ -1048,7 +1051,6 @@ class DirText(SimpleText):
         if self.value is not None:
             result.attrib['value'] = self.value
         return result
-
 
 #
 # CURRENT TODO:

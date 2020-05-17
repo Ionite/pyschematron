@@ -3,6 +3,7 @@ from elementpath.xpath2_parser import XPath2Parser as XPath2Parser
 from elementpath.xpath1_parser import is_document_node
 from pyschematron.elementpath_extensions.context import XPathContextXSLT
 
+
 def oselect_with_context(document_root, context_item, path, namespaces=None, parser=None, **kwargs):
     """
     XPath selector function that apply a *path* expression on *root* Element.
@@ -24,6 +25,7 @@ def oselect_with_context(document_root, context_item, path, namespaces=None, par
     print("[XX] RESULTS ARE: %s (%s)" % (str(results), str(type(results))))
     return results
 
+
 def select_with_context(document, context_item, path, namespaces=None, parser=None, **kwargs):
     """
     XPath selector function that apply a *path* expression on *root* Element.
@@ -43,6 +45,7 @@ def select_with_context(document, context_item, path, namespaces=None, parser=No
     context = XPathContextXSLT(document, item=context_item)
     result = root_token.get_results(context)
     return result
+
 
 class SelectorWithContext(object):
     pass

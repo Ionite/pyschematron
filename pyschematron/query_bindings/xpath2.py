@@ -10,6 +10,7 @@ from pyschematron.elementpath_extensions.context import XPathContextXSLT
 
 from elementpath import XPath2Parser, XPathContext, select, Selector
 
+
 def instantiate():
     return XPath2Binding()
 

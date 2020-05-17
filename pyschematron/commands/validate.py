@@ -3,8 +3,8 @@ import sys
 from lxml import etree
 from pyschematron.elements import Schema
 
-def main(schematron_file, xml_file, phase="#DEFAULT", output_type="text", output_stream=sys.stdout, verbosity=1):
 
+def main(schematron_file, xml_file, phase="#DEFAULT", output_type="text", output_stream=sys.stdout, verbosity=1):
     schema = Schema(verbosity=verbosity)
     schema.read_from_file(schematron_file)
     schema.process_abstract_patterns()
@@ -21,7 +21,6 @@ def main(schematron_file, xml_file, phase="#DEFAULT", output_type="text", output
         raise Exception("Unknown output type: %s" % output_type)
 
 
-
 def validate_to_text(schema, doc, xml_file, phase="#DEFAULT", output_stream=sys.stdout, verbosity=1):
     report = schema.validate_document(doc, phase=phase)
     # Split up the failed asserts by flag; assert with flag
@@ -35,13 +34,13 @@ def validate_to_text(schema, doc, xml_file, phase="#DEFAULT", output_stream=sys.
 
     if verbosity > 0:
         for error, element in errors:
-            #output_stream.write("Error: %s\n" % error.text)
+            # output_stream.write("Error: %s\n" % error.text)
             output_stream.write("Error: %s\n" % error.to_string(resolve=True, xml_doc=doc, current_element=element, namespaces=schema.ns_prefixes))
             for d_id in error.diagnostic_ids:
                 if d_id in error.get_schema().diagnostics:
                     output_stream.write("Proposal for solution: %s\n" % error.get_schema().diagnostics[d_id].text)
         for warning, element in warnings:
-            #output_stream.write("Warning: %s\n" % warning.text)
+            # output_stream.write("Warning: %s\n" % warning.text)
             output_stream.write("Warning: %s\n" % warning.to_string(resolve=True, xml_doc=doc, current_element=element, namespaces=schema.ns_prefixes))
 
             for d_id in warning.diagnostic_ids:

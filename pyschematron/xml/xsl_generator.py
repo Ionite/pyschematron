@@ -107,7 +107,7 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
     root.append(C('KEYS AND FUNCTIONS'))
     root.append(C('DEFAULT RULES'))
 
-    #root.append(get_predefined_elements())
+    # root.append(get_predefined_elements())
     for predefined in predefined_elements:
         root.append(predefined)
 
@@ -124,7 +124,7 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
     schematron_output_comment.append(E('xsl', 'value-of', {'select': '$fileDirParameter'}))
     schematron_output.append(schematron_output_comment)
 
-    for prefix,namespace in schema.ns_prefixes.items():
+    for prefix, namespace in schema.ns_prefixes.items():
         schematron_output.append(E('svrl', 'ns-prefix-in-attribute-values', {'uri': namespace, 'prefix': prefix}))
     if schema.query_binding_name == 'xslt2':
         schematron_output.append(E('svrl', 'ns-prefix-in-attribute-values', {'uri': 'http://www.w3.org/2001/XMLSchema', 'prefix': 'xs'}))
@@ -145,7 +145,7 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
 
     root.append(C('SCHEMATRON PATTERNS'))
     root.append(E('svrl', 'text', text=schema.title or ""))
-    for name,value in schema.variables.items():
+    for name, value in schema.variables.items():
         root.append(E('xsl', 'variable', {'name': name, 'select': value}))
     if phase:
         for name, value in phase.variables.items():
@@ -173,7 +173,8 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
                     successful_report.append(E('xsl', 'attribute', {'name': 'id'}, text=report.id))
                 if report.flag and report.flag != 'error':
                     successful_report.append(E('xsl', 'attribute', {'name': 'flag'}, text=report.flag))
-                successful_report.append(E('xsl', 'attribute', {'name': 'location'}, child=E('xsl', 'apply-templates', {'select': '.', 'mode': 'schematron-select-full-path'})))
+                successful_report.append(
+                    E('xsl', 'attribute', {'name': 'location'}, child=E('xsl', 'apply-templates', {'select': '.', 'mode': 'schematron-select-full-path'})))
 
                 text_element = create_ruletest_text_element(report)
                 successful_report.append(text_element)
@@ -194,7 +195,8 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
                     failed_assert.append(E('xsl', 'attribute', {'name': 'id'}, text=assertion.id))
                 if assertion.flag and assertion.flag != 'error':
                     failed_assert.append(E('xsl', 'attribute', {'name': 'flag'}, text=assertion.flag))
-                failed_assert.append(E('xsl', 'attribute', {'name': 'location'}, child=E('xsl', 'apply-templates', {'select': '.', 'mode': 'schematron-select-full-path'})))
+                failed_assert.append(
+                    E('xsl', 'attribute', {'name': 'location'}, child=E('xsl', 'apply-templates', {'select': '.', 'mode': 'schematron-select-full-path'})))
 
                 text_element = create_ruletest_text_element(assertion)
                 failed_assert.append(text_element)
@@ -206,13 +208,13 @@ def schema_to_xsl(schema, phase_name="#DEFAULT"):
                 rule_element.append(choose)
 
             # depends on qbinding maybe?
-            #rule_element.append(E('xsl', 'apply-templates', {'select': '*|comment()|processing-instruction()', 'mode': "M%d" % mode_count}))
+            # rule_element.append(E('xsl', 'apply-templates', {'select': '*|comment()|processing-instruction()', 'mode': "M%d" % mode_count}))
             rule_element.append(E('xsl', 'apply-templates', {'select': apply_templates_select, 'mode': "M%d" % mode_count}))
             root.append(rule_element)
             priority -= 1
         root.append(E('xsl', 'template', {'match': 'text()', 'priority': '-1', 'mode': "M%d" % mode_count}))
         # depends on qbinding maybe?
-        #root.append(E('xsl', 'template', {'match': '@*|node()', 'priority': '-2', 'mode': "M%d" % mode_count},
+        # root.append(E('xsl', 'template', {'match': '@*|node()', 'priority': '-2', 'mode': "M%d" % mode_count},
         #              child=E('xsl', 'apply-templates', {'select': '*|comment()|processing-instruction()', 'mode': 'M%d' % mode_count})))
         root.append(E('xsl', 'template', {'match': '@*|node()', 'priority': '-2', 'mode': "M%d" % mode_count},
                       child=E('xsl', 'apply-templates', {'select': apply_templates_select, 'mode': 'M%d' % mode_count})))
@@ -232,6 +234,7 @@ def add_ruletest_diagnostics(assertion, failed_assert):
         else:
             diagnostic_reference.text = diagnostic.text
         failed_assert.append(diagnostic_reference)
+
 
 def create_ruletest_text_element(ruletest):
     # Convert the textual part of the report

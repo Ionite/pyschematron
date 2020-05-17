@@ -4,7 +4,7 @@ setup(
     name='pyschematron',
     version='0.1',
     packages=['pyschematron'],
-    scripts=['bin/pyschematron-validate.py', 'bin/pyschematron-convert.py'],
+    scripts=['bin/pyschematron-validate', 'bin/pyschematron-convert'],
     url='https://github.com/ionite/pyschematron',
     license='MIT',
     author='Jelte Jansen',

@@ -260,9 +260,11 @@ PREDEFINED_XSLT2 = """<predefined xmlns:xsl="http://www.w3.org/1999/XSL/Transfor
 <xsl:template match="text()" priority="-1"/>
 </predefined>"""
 
+
 def get_predefined_elements_xslt1():
     """Returns the predefined elements, wrapped in an element called 'predefined'"""
     return etree.XML(PREDEFINED_XSLT1.replace("\n", ""))
+
 
 def get_predefined_elements_xslt2():
     """Returns the predefined elements, wrapped in an element called 'predefined'"""

@@ -1,5 +1,5 @@
-
 from pyschematron.exceptions import SchematronError, SchematronNotImplementedError
+
 
 class QueryBinding(object):
     #
@@ -29,7 +29,6 @@ class QueryBinding(object):
 
     def evaluate_assertion(self, xml_document, context_element, namespaces, parser_variables, assertion):
         raise SchematronNotImplementedError("%s not implemented in query binding %s" % ("assertion evaluation", self.get_name()))
-
 
     #
     # Optional to implement in derived classes

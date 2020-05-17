@@ -1,4 +1,3 @@
-
 """
 SVRL parsing and creation classes
 """
@@ -14,6 +13,7 @@ NS = {
     'sch': 'http://purl.oclc.org/dsdl/schematron',
     'svrl': 'http://purl.oclc.org/dsdl/svrl'
 }
+
 
 def E(prefix, name, attrs=None, nsmap=None, child=None, text=None):
     _nsmap = copy.copy(NS)
@@ -37,6 +37,7 @@ def E(prefix, name, attrs=None, nsmap=None, child=None, text=None):
 
 class SVRLError(Exception):
     pass
+
 
 class SchematronOutput(object):
     def __init__(self, title=None, phase=None, schema_version=None, namespaces=OrderedDict(), xml_element=None):
@@ -100,7 +101,7 @@ class SchematronOutput(object):
 
         for text in self.texts:
             element.append(text.to_xml())
-        for prefix,uri in self.attribute_prefixes.items():
+        for prefix, uri in self.attribute_prefixes.items():
             element.append(E('svrl', 'ns-prefix-in-attribute-values', {'prefix': prefix, 'uri': uri}))
         for active_pattern in self.active_patterns:
             # Note: fired-rules, failed-assert and successful-report elements are *not* nested!
@@ -112,8 +113,8 @@ class SchematronOutput(object):
                 for report in fired_rule.reports:
                     element.append(report.to_xml())
 
-
         return element
+
 
 class ActivePattern(object):
     def __init__(self, id=None, name=None, role=None, xml_element=None):
@@ -140,6 +141,7 @@ class ActivePattern(object):
 
     def add_fired_rule(self, fired_rule):
         self.fired_rules.append(fired_rule)
+
 
 class FiredRule(object):
     def __init__(self, id=None, context=None, role=None, flag=None, xml_element=None):
@@ -170,6 +172,7 @@ class FiredRule(object):
 
     def add_report(self, report):
         self.reports.append(report)
+
 
 class Report(object):
     def __init__(self, id=None, location=None, test=None, role=None, flag=None, xml_element=None):
@@ -215,11 +218,14 @@ class Report(object):
             element.append(self.text.to_xml())
         return element
 
+
 class FailedAssert(Report):
     NAME = 'failed-assert'
 
+
 class SuccessfulReport(Report):
     NAME = 'successful-report'
+
 
 class DiagnosticReference(object):
     def __init__(self, diagnostic=None, xml_element=None):
@@ -243,6 +249,7 @@ class DiagnosticReference(object):
 
         if self.text is not None:
             element.append(self.text.to_xml())
+
 
 class Text(object):
     def __init__(self, text=None, xml_element=None):

@@ -21,4 +21,4 @@ class TestSVRL(unittest.TestCase):
         svrl = SchematronOutput(xml_element=xml_doc.getroot())
         new_xml = svrl.to_xml()
 
-        #print(etree.tostring(new_xml, pretty_print=True).decode('utf-8'))
+        # print(etree.tostring(new_xml, pretty_print=True).decode('utf-8'))
