@@ -16,6 +16,7 @@ def main(schematron_file, xml_file, phase="#DEFAULT", output_type="text", output
         svrl = schema.validate_document_to_svrl(doc, phase)
         output_stream.write(etree.tostring(svrl.to_xml(), pretty_print=True, xml_declaration=True, encoding='utf-8').decode('utf-8'))
         output_stream.write("\n")
+        return 0
     else:
         raise Exception("Unknown output type: %s" % output_type)
 

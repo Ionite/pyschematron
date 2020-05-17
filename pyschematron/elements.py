@@ -789,8 +789,8 @@ class RuleTest(ComplexText):
         return element
 
     def get_diagnostic(self, diagnostic_id):
-        if diagnostic_id in self.rule.pattern.schema.diagnostics:
-            return self.rule.pattern.schema.diagnostics[diagnostic_id]
+        if diagnostic_id in self.get_schema().diagnostics:
+            return self.get_schema().diagnostics[diagnostic_id]
 
     def get_diagnostic_text(self, diagnostic_id):
         if diagnostic_id not in self.get_schema().diagnostics:
@@ -1014,6 +1014,9 @@ class SimpleText(SchemaObject):
         return self.text
 
     def to_xsl(self):
+        return E('sch', self.NAME, text=self.text)
+
+    def to_minimal_xml(self):
         return E('sch', self.NAME, text=self.text)
 
 

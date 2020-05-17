@@ -10,8 +10,8 @@ import copy
 from pyschematron.xml import xml_util
 
 NS = {
-#    'xsl': 'http://www.w3.org/1999/XSL/Transform',
-#    'sch': 'http://purl.oclc.org/dsdl/schematron',
+    'xsl': 'http://www.w3.org/1999/XSL/Transform',
+    'sch': 'http://purl.oclc.org/dsdl/schematron',
     'svrl': 'http://purl.oclc.org/dsdl/svrl'
 }
 
