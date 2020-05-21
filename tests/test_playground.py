@@ -32,7 +32,12 @@ def parse_expression(xml_document, expression, namespaces, variables, context_it
 class XLSTTransform:
     def __init__(self, xslt):
         self.xslt = xslt
-        self.variables = {}
+        self.variables = {
+            'archiveDirParameter': '',
+            'archiveNameParameter': '',
+            'fileNameParameter': '',
+            'fileDirParameter': ''
+        }
         self.mode_templates = {}
         self._process_xslt()
 
@@ -92,38 +97,15 @@ class XLSTTransform:
         output_node = etree.Element("new_root")
         self.process_template(xml_doc, template, xml_doc.getroot(), output_node)
         print("[XX] RESULT:")
-        print(etree.tostring(output_node, pretty_print=True).decode('utf-8'))
+        # clear out all whitespace and parse again
+        str = etree.tostring(output_node, pretty_print=True).decode('utf-8')
+        parser = etree.XMLParser(remove_blank_text=True)
+        new = etree.fromstring(str, parser=parser)
+        print(etree.tostring(new, pretty_print=True).decode('utf-8'))
 
 
-    # Loop over all direct children
-    # if they are xsl, replace by transform result
-    # if not, leave
-    def process_template_children(self, output_node, xml_doc, context_node):
-        for child in output_node.getchildren():
-            if isinstance(child, etree._Comment):
-                # Remove comments from xsl
-                output_node.remove(child)
-                continue
-            el_qname = etree.QName(child)
-            if el_qname.namespace == 'http://www.w3.org/1999/XSL/Transform':
-                output_node.remove(child)
-                el_name = el_qname.localname
-                if el_name == 'apply-templates' and 'mode' in child.attrib:
-                    self.process_xsl_apply_template(child, context_node, xml_doc)
-                elif el_name == 'attribute':
-                    attr_name = child.attrib['name']
-                    if ''
-                    output_node.attrib[] = "ADSF"
-                elif el_name == 'value-of':
-                    if 'select' in child.attrib:
-                        result = parse_expression(source_xml_doc, "string(%s)" % var_node.attrib['select'], var_node.nsmap, self.variables,
-                                                  context_item=source_context_node)
-                        output_node.text += " " + result + " "
-
-                    else:
-                        raise Exception('value-of without select')
-            else:
-                self.process_template_children(child, xml_doc, context_node)
+    def process_template_child(self, output_node, xml_doc, context_node, child):
+        return child
 
     def process_xsl_apply_template(self, child, context_node, xml_doc):
         mode = child.attrib['mode']
@@ -148,21 +130,77 @@ class XLSTTransform:
                 # pick the first one and process
                 self.process_template(xml_doc, new_template, element_from_select, child)
 
+    def process_node(self, node, xml_doc, context_node, output_node):
+        if isinstance(node, etree._Comment):
+            # Remove comments from xsl
+            return None
+        el_qname = etree.QName(node)
+        if el_qname.namespace == 'http://www.w3.org/1999/XSL/Transform':
+            el_name = el_qname.localname
+            if el_name == 'comment':
+                value = node.text
+                for attr_child in node.getchildren():
+                    value += str(self.process_node(attr_child, xml_doc, context_node, output_node))
+                    if attr_child.tail is not None:
+                        value += attr_child.tail
+                return etree.Comment(value)
+                #return node.text
+            elif el_name == 'value-of':
+                value = self.process_xsl_value_of(node, xml_doc, context_node)
+                #print("[XX] RESULT OF VALUE OF (%s) %s" % (str(type(value)), str(value)))
+                return value
+            elif el_name == 'attribute':
+                name = node.attrib['name']
+                value = node.text
+                for attr_child in node.getchildren():
+                    value += str(self.process_node(attr_child, xml_doc, context_node, output_node))
+                    if attr_child.tail is not None:
+                        value += attr_child.tail
+                output_node.attrib[name] = value
+            elif el_name == 'apply-templates':
+                return self.process_template(xml_doc, node, context_node, output_node)
+            else:
+                raise Exception("NotImpl: XSL directive '%s'" % el_name)
+        else:
+            new_output_node = etree.Element(node.tag, attrib=node.attrib, nsmap=node.nsmap)
+            self.process_node_children(node, xml_doc, context_node, new_output_node)
+            return new_output_node
+
+    def process_node_children(self, node, xml_doc, context_node, output_node):
+        for child in node:
+            process_node_result = self.process_node(child, xml_doc, context_node, output_node)
+            if process_node_result is None:
+                pass
+            elif isinstance(process_node_result, etree._Element):
+                output_node.append(process_node_result)
+            elif isinstance(process_node_result, str):
+                # TODO: should this be added to text, or should we see if there are preceding child nodes
+                # and use tail?
+                # TODO: children of attribute?
+                if output_node.text is None:
+                    output_node.text = process_node_result
+                else:
+                    output_node.text += process_node_result
+            else:
+                raise Exception("NOTIMPL: return type %s from process_node" % str(type(process_node_result)))
+        return output_node
+
+    def process_xsl_value_of(self, node, xml_doc, context_node):
+        select = node.attrib['select']
+        # TODO: add document-uri to possible functions?
+        if select == 'document-uri(/)':
+            return ""
+        else:
+            result = parse_expression(xml_doc, "string(%s)" % node.attrib['select'], node.nsmap, self.variables, context_item=context_node)
+        return result
+
     def process_template(self, xml_doc, template, context_node, output_node):
+        #print("[XX] PROCESS TEMPLATE MODE %s" % (template.attrib.get('mode')))
         # copy all children, then process them
-        for source_child in template:
-            output_node.append(copy.copy(source_child))
-        self.process_template_children(output_node, xml_doc, context_node)
+        #for child in template:
+        #    output_node.append(copy.copy(source_child))
+        return self.process_node_children(template, xml_doc, context_node, output_node)
 
-
-def get_potential_templates(mode_templates, template_nodes, mode, context_element):
-    result = []
-    for template in mode_templates[mode]:
-        myprint("[XX] try: " + str(template))
-        myprint("[XX] elements:" + str(template_nodes[template]))
-        if context_element in template_nodes[template]:
-            result.append(template)
-    return result
 
 class PlaygroundTest(unittest.TestCase):
     """Assorted tests, mainly used as a playground for later development"""
