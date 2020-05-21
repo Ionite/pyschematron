@@ -3,6 +3,7 @@ from pyschematron.exceptions import *
 
 from elementpath import XPath1Parser, XPathContext, select, Selector
 from elementpath.xpath_nodes import is_element_node
+from elementpath.exceptions import ElementPathSyntaxError
 from pyschematron.elementpath_extensions.xslt1_parser import XSLT1Parser
 from pyschematron.elementpath_extensions.context import XPathContextXSLT
 from lxml import etree
@@ -67,9 +68,12 @@ class XSLTBinding(object):
         context = XPathContextXSLT(root=xml_document, item=context_element)
         expr = assertion
         # Should we check whether this is boolean?
-        root_token = parser.parse(expr)
-        result = root_token.evaluate(context=context)
-        return result
+        try:
+            root_token = parser.parse(expr)
+            result = root_token.evaluate(context=context)
+            return result
+        except ElementPathSyntaxError as epse:
+            raise QueryBindingError("Unable to parse expression: %s" % expr, epse)
 
 
     def get_variable_delimiter(self):

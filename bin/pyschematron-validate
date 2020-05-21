@@ -16,11 +16,14 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--verbosity', type=int, default=1, help='verbosity (0 for no output, 5 for full debug output)')
     parser.add_argument('-t', '--output-type', default='text', help='output type (text, svrl)')
     parser.add_argument('-o', '--output-file', help='Write output to file instead of stdout')
+    parser.add_argument('-e', '--error-flags', default='error,fatal', help='Comma-separated list of flags to treat as errors (default: error,fatal)')
     args = parser.parse_args()
+
+    error_flags = [flag.strip() for flag in args.error_flags.split(',')]
 
     if args.output_file:
         with open(args.output_file, 'w') as outfile:
-            rcode = main(args.schematron_file, args.xml_file, args.phase, args.output_type, outfile, args.verbosity)
+            rcode = main(args.schematron_file, args.xml_file, args.phase, error_flags, args.output_type, outfile, args.verbosity)
     else:
-        rcode = main(args.schematron_file, args.xml_file, args.phase, args.output_type, sys.stdout, args.verbosity)
+        rcode = main(args.schematron_file, args.xml_file, args.phase, error_flags, args.output_type, sys.stdout, args.verbosity)
     sys.exit(rcode)

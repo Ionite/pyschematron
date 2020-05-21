@@ -98,7 +98,10 @@ class ValidationContext(object):
                     self.msg(5, "  %s: %s" % (k, v))
                 self.msg(5, "Context root: %s" % str(self.xml_doc.getroot()))
                 self.msg(5, "Context item: %s" % rule.context)
-                self.msg(5, "CONTEXT ELEMENT: " + etree.tostring(element, pretty_print=True).decode('utf-8'))
+                if isinstance(element, etree._Element):
+                    self.msg(5, "CONTEXT ELEMENT: " + etree.tostring(element, pretty_print=True).decode('utf-8'))
+                else:
+                    self.msg(5, "CONTEXT ELEMENT: " + str(element))
                 if assert_test.id:
                     self.msg(5, "Id: " + assert_test.id)
                 self.msg(5, "Test: '%s'" % assert_test.test)
@@ -131,6 +134,9 @@ class ValidationContext(object):
 
 class ValidationReport(object):
     def __init__(self):
+        # fired_rules is a dictionary keyed by the rule context,
+        # where the value is a tuple containing the failed Assertion or successful Report,
+        # and the xml element that fired it
         self.fired_rules = OrderedDict()
 
     def add_fired_rule(self, rule_context):

@@ -21,9 +21,9 @@ class TestValidateCommand(unittest.TestCase):
 
     def test_validate(self):
         """Test whether the commands run, complete, and return the correct result code. We do not verify the actual output in this test"""
-        self.run_command("data/schematron/all_elements.sch", "data/xml/diagnostics/more_than_three_animals.xml", -1)
+        self.run_command("data/schematron/all_elements.sch", "data/xml/diagnostics/more_than_three_animals.xml", 21)
         self.run_command("data/schematron/advanced_text.sch", "data/xml/basic1_ok.xml")
-        self.run_command("data/schematron/diagnostics.sch", "data/xml/diagnostics/more_than_three_animals.xml", -1)
+        self.run_command("data/schematron/diagnostics.sch", "data/xml/diagnostics/more_than_three_animals.xml", 3)
 
     def test_validate_to_svrl(self):
         self.run_command("data/schematron/all_elements.sch", "data/xml/diagnostics/more_than_three_animals.xml", output_type='svrl')
