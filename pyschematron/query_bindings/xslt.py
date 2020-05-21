@@ -32,6 +32,7 @@ class XSLTBinding(object):
         :return:
         """
         #result = select(xml_document, rule_context, namespaces=namespaces, variables=variables, parser=XPath1Parser)
+        print("[XX] GET ELEMENTS FOR CONTEXT '%s'" % rule_context)
         result = select(xml_document, rule_context, namespaces=namespaces, variables=variables, parser=XSLT1Parser)
         if rule_context.startswith('/'):
             return result
@@ -41,6 +42,7 @@ class XSLTBinding(object):
             for el in xml_document.iter():
                 if is_element_node(el):
                     result.extend(selector.select(el))
+            print("[XX] RESULT: '%s'" % str(result))
             return result
 
     def check_element_context(self, root_element, element, context, namespaces, variables):
