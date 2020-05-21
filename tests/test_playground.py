@@ -1,6 +1,7 @@
 import unittest
 from io import StringIO
 
+import copy
 from lxml import etree
 
 from pyschematron.commands import validate
@@ -9,6 +10,8 @@ from pyschematron.commands import convert
 from pyschematron.elementpath_extensions.select import select_with_context, select_all_with_context
 
 from test_util import get_file
+from pyschematron.elementpath_extensions.xslt2_parser import XSLT2Parser
+from pyschematron.elementpath_extensions.context import XPathContextXSLT
 
 def elem_priority(elem):
     if 'priority' in elem.attrib:
@@ -18,6 +21,13 @@ def elem_priority(elem):
 
 def myprint(text):
     print(text)
+
+def parse_expression(xml_document, expression, namespaces, variables, context_item=None):
+    parser = XSLT2Parser(namespaces, variables)
+    root_node = parser.parse(expression)
+    context = XPathContextXSLT(root=xml_document, item=context_item)
+    result = root_node.evaluate(context)
+    return result
 
 class XLSTTransform:
     def __init__(self, xslt):
@@ -79,58 +89,70 @@ class XLSTTransform:
         myprint("[XX] initial potential templates:")
         myprint(potential_templates)
         template = potential_templates[0]
-        self.process_template(xml_doc, template, xml_doc.getroot())
+        output_node = etree.Element("new_root")
+        self.process_template(xml_doc, template, xml_doc.getroot(), output_node)
+        print("[XX] RESULT:")
+        print(etree.tostring(output_node, pretty_print=True).decode('utf-8'))
 
-    def PREVprocess_template(self, xml_doc, template, context_node):
-        for child in template.iter():
-            el_name = etree.QName(child.tag).localname
-            if el_name == 'apply-templates' and 'select' in child.attrib and 'mode' in child.attrib:
-                mode = child.attrib['mode']
-                select = child.attrib['select']
-                myprint("[XX] looking for template mode %s select %s" % (mode, select))
-                if select == '/':
-                    elements_from_select = [xml_doc.getroot()]
-                else:
-                    elements_from_select = select_with_context(xml_doc, context_node, select, namespaces=self.xslt.getroot().nsmap, variables=self.variables)
-                for element_from_select in elements_from_select:
-                    myprint("[XX] element from select: " + str(element_from_select))
-                    if isinstance(element_from_select, etree._ElementTree):
-                        element_from_select = element_from_select.getroot()
-                    myprint("ELEMENT: " + str(element_from_select))
-                    potential_templates = self.get_potential_templates(mode, xml_doc, context_node, element_from_select)
-                    if len(potential_templates) == 0:
-                        myprint("[XX] no potential tempaltes")
-                    for template in potential_templates:
-                        myprint("[XX] potential template: mode %s match %s" % (template.attrib['mode'], template.attrib['match']))
 
-    def process_template(self, xml_doc, template, context_node):
-        for child in template.iter():
+    # Loop over all direct children
+    # if they are xsl, replace by transform result
+    # if not, leave
+    def process_template_children(self, output_node, xml_doc, context_node):
+        for child in output_node.getchildren():
             if isinstance(child, etree._Comment):
+                # Remove comments from xsl
+                output_node.remove(child)
                 continue
-            el_name = etree.QName(child.tag).localname
-            if el_name == 'apply-templates' and 'select' in child.attrib and 'mode' in child.attrib:
-                mode = child.attrib['mode']
-                select = child.attrib.get('select')
-                if select is None:
-                    elements_from_select = [ context_node ]
-                elif select is '/':
-                    elements_from_select = [ xml_doc.getroot() ]
-                else:
-                    elements_from_select = select_with_context(xml_doc, context_node, select, namespaces=self.xslt.getroot().nsmap, variables=self.variables)
+            el_qname = etree.QName(child)
+            if el_qname.namespace == 'http://www.w3.org/1999/XSL/Transform':
+                output_node.remove(child)
+                el_name = el_qname.localname
+                if el_name == 'apply-templates' and 'mode' in child.attrib:
+                    self.process_xsl_apply_template(child, context_node, xml_doc)
+                elif el_name == 'attribute':
+                    attr_name = child.attrib['name']
+                    if ''
+                    output_node.attrib[] = "ADSF"
+                elif el_name == 'value-of':
+                    if 'select' in child.attrib:
+                        result = parse_expression(source_xml_doc, "string(%s)" % var_node.attrib['select'], var_node.nsmap, self.variables,
+                                                  context_item=source_context_node)
+                        output_node.text += " " + result + " "
 
-                for element_from_select in elements_from_select:
-                    potential_templates = self.get_potential_templates(mode, xml_doc, element_from_select)
-                    if len(potential_templates) == 0:
-                        myprint("[XX] no potential templates")
                     else:
-                        #for template in potential_templates:
-                        #    myprint("[XX] potential template: mode %s match %s priority %s" % (template.attrib['mode'], template.attrib['match'], str(template.attrib.get('priority'))))
-                        new_template = potential_templates[0]
-                        myprint("[XX] applying template: context node %s mode %s match %s priority %s" % (
-                            str(element_from_select),
-                            new_template.attrib['mode'], new_template.attrib['match'], str(new_template.attrib.get('priority'))))
-                        # pick the first one and process
-                        self.process_template(xml_doc, new_template, element_from_select)
+                        raise Exception('value-of without select')
+            else:
+                self.process_template_children(child, xml_doc, context_node)
+
+    def process_xsl_apply_template(self, child, context_node, xml_doc):
+        mode = child.attrib['mode']
+        select = child.attrib.get('select')
+        if select is None:
+            elements_from_select = [context_node]
+        elif select is '/':
+            elements_from_select = [xml_doc.getroot()]
+        else:
+            elements_from_select = select_with_context(xml_doc, context_node, select, namespaces=self.xslt.getroot().nsmap, variables=self.variables)
+        for element_from_select in elements_from_select:
+            potential_templates = self.get_potential_templates(mode, xml_doc, element_from_select)
+            if len(potential_templates) == 0:
+                myprint("[XX] no potential templates")
+            else:
+                # for template in potential_templates:
+                #    myprint("[XX] potential template: mode %s match %s priority %s" % (template.attrib['mode'], template.attrib['match'], str(template.attrib.get('priority'))))
+                new_template = potential_templates[0]
+                myprint("[XX] applying template: context node %s mode %s match %s priority %s" % (
+                    str(element_from_select),
+                    new_template.attrib['mode'], new_template.attrib['match'], str(new_template.attrib.get('priority'))))
+                # pick the first one and process
+                self.process_template(xml_doc, new_template, element_from_select, child)
+
+    def process_template(self, xml_doc, template, context_node, output_node):
+        # copy all children, then process them
+        for source_child in template:
+            output_node.append(copy.copy(source_child))
+        self.process_template_children(output_node, xml_doc, context_node)
 
 
 def get_potential_templates(mode_templates, template_nodes, mode, context_element):
