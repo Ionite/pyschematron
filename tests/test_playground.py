@@ -2,10 +2,8 @@ import unittest
 from io import StringIO
 
 import copy
+from collections import OrderedDict
 from lxml import etree
-
-from pyschematron.commands import validate
-from pyschematron.commands import convert
 
 from pyschematron.elementpath_extensions.select import select_with_context, select_all_with_context
 
@@ -231,7 +229,7 @@ class XLSTTransform:
         myprint(potential_templates)
         template = potential_templates[0]
         output_node = etree.Element("new_root")
-        process_result = self.process_template(xml_doc, template, xml_doc.getroot())
+        process_result = self.process_template(xml_doc, template, None)
         self.apply_process_result(output_node, process_result)
         print("[XX] RESULT:")
         # clear out all whitespace and parse again
@@ -244,7 +242,61 @@ class XLSTTransform:
     def process_template_child(self, output_node, xml_doc, context_node, child):
         return child
 
-    def process_xsl_apply_template(self, child, context_node, xml_doc):
+
+    def process_xsl_apply_template(self, template_node, context_node, xml_doc):
+        # If select is not given, apply to all children of the context_node
+        print("[XX] Process XSL apply-templates mode: %s select: %s" % (str(template_node.attrib.get('mode')), str(template_node.attrib.get('select'))))
+        print("[XX] with context node: " + str(context_node))
+        mode = template_node.attrib.get('mode')
+        select = template_node.attrib.get('select')
+        if select is None:
+            if context_node is None:
+                elements_to_apply_on = [xml_doc.getroot()]
+            else:
+                elements_to_apply_on = context_node.getchildren()
+        elif select == '/':
+            elements_to_apply_on = [xml_doc]
+        else:
+            print("[XX] run select_with_context context %s select %s" % (str(context_node), str(select)))
+            elements_to_apply_on = select_with_context(xml_doc, context_node, select, namespaces=self.xslt.getroot().nsmap, variables=self.variables)
+
+        print("[XX] Elements to apply templates on:")
+        for e in elements_to_apply_on:
+            print("[XX]    %s" % str(e))
+
+        mode_templates = self.mode_templates[mode]
+        print("[XX] Potential templates:")
+        templates_to_apply = []
+
+        element_templates_todo = OrderedDict()
+        for t in mode_templates:
+            print("[XX]    mode: %s match: %s" % (mode, str(t.attrib.get('match'))))
+            if context_node == xml_doc:
+                look_for_context = None
+            else:
+                look_for_context = context_node
+            template_match_elements = select_with_context(xml_doc, look_for_context, t.attrib['match'], namespaces=self.xslt.getroot().nsmap, variables=self.variables)
+            for tme in template_match_elements:
+                print("[XX]    template match element: " + str(tme))
+                if tme in elements_to_apply_on or elements_to_apply_on == [xml_doc]:
+                    print("[XX] THIS TEMPLATE IS APPLICABLE FOR %s" % str(tme))
+                    if tme in element_templates_todo:
+                        element_templates_todo[tme].append(t)
+                    else:
+                        element_templates_todo[tme] = [t]
+        print("[XX] ALL TEMPLATES TO RUN:")
+        print(element_templates_todo)
+        result = []
+        for element,templates in element_templates_todo.items():
+            sorted_templates = sorted(templates, key=elem_priority, reverse=True)
+            template_result = self.process_template(xml_doc, templates[0], element)
+            if isinstance(template_result, list):
+                result.extend(template_result)
+            else:
+                result.append(template_result)
+        return result
+
+    def prev_process_xsl_apply_template(self, child, context_node, xml_doc):
         mode = child.attrib.get('mode')
         select = child.attrib.get('select')
         if select is None:
@@ -261,8 +313,6 @@ class XLSTTransform:
         result = []
         for element_from_select in elements_from_select:
             print("[XX] LOOKING FOR TEMPLATE FOR SELECTED ELEMENT %s" % element_from_select)
-            # Get potential templates;
-            # there are two
             potential_templates = self.get_potential_templates2(mode, xml_doc, context_node, element_from_select)
             if len(potential_templates) == 0:
                 myprint("[XX] no potential templates")
@@ -404,7 +454,7 @@ class XLSTTransform:
             result = parse_expression(xml_doc, "string(%s)" % node.attrib['select'], node.nsmap, self.variables, context_item=context_node)
         return result
 
-    def process_template(self, xml_doc, template, context_node):
+    def prevprocess_template(self, xml_doc, template, context_node):
         print("[XX] PROCESS TEMPLATE MODE %s MATCH %s" % (template.attrib.get('mode'), str(template.attrib.get('match'))))
         if context_node == xml_doc or context_node is None:
             if template.attrib['match'] != '/':
@@ -416,6 +466,10 @@ class XLSTTransform:
         # copy all children, then process them
         #for child in template:
         #    output_node.append(copy.copy(source_child))
+        return self.process_node_children(template, xml_doc, context_node)
+
+    def process_template(self, xml_doc, template, context_node):
+        print("[XX] PROCESS TEMPLATE MODE %s MATCH %s" % (template.attrib.get('mode'), str(template.attrib.get('match'))))
         return self.process_node_children(template, xml_doc, context_node)
 
 
@@ -452,6 +506,11 @@ class PlaygroundTest(unittest.TestCase):
     def test_siubl20(self):
         self.do_run_xslt_test2("/home/jelte/repos/SI/validation/xsl/si-ubl-2.0.xsl",
                                "/home/jelte/repos/SI/testset/SI-UBL-2.0/SI-UBL-2.0_BR-NL-1_error_wrong_scheme.xml")
+
+    def test_custom(self):
+        self.do_run_xslt_test2(get_file("xslt", "student_sample.xsl"),
+                              get_file("xml", "xslt/student_sample.xml"))
+
 
 if __name__ == '__main__':
     unittest.main()
