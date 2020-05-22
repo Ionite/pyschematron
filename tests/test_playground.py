@@ -110,13 +110,60 @@ class XLSTTransform:
                     # TODO: problem here;
                     # sometimes we need the xml_doc.getroot() as the context
                     # sometimes None. How to tell the difference?
-                    look_for_context = None
+                    #look_for_context = None
+                    look_for_context = xml_doc
                 else:
                     look_for_context = context_element
                 applicable_elements = select_with_context(xml_doc, look_for_context, match, namespaces=self.xslt.getroot().nsmap, variables=self.variables)
             myprint("[XX] elements:" + str(applicable_elements))
             if len(applicable_elements) > 0:
                 print("[XX] template is applicable")
+                result.append(template)
+        # TODO: sort
+        result = sorted(result, key=elem_priority, reverse=True)
+        return result
+
+    def get_potential_templates2(self, mode, xml_doc, context_element, selected_element):
+        """
+        Returns all templates for the given mode where the given 'selected_element' is in
+        the results of the 'match' expresion of the template for the given context.
+        If selected_elements is None, returns all templates where 'match' result is not empty
+        :param mode:
+        :param xml_doc:
+        :param context_element: The XML node that is the current context
+        :param element: The potential node (based on the 'select' statement of apply-template)
+        :return:
+        """
+        result = []
+        for template in self.mode_templates[mode]:
+            match = template.attrib['match']
+            myprint("[XX] try template mode %s match %s" % (mode, match))
+            myprint("[XX]   the context_node is %s" %  str(context_element))
+            myprint("[XX]   looking for selected element %s" % str(selected_element))
+            #myprint("[XX] looking for element %s" % str(element))
+            if match == '/':
+                if context_element == xml_doc:
+                    applicable_elements = [ xml_doc ]
+                else:
+                    applicable_elements = []
+                applicable_elements = [ xml_doc ]
+            else:
+                if context_element == xml_doc:
+                    # TODO: problem here;
+                    # sometimes we need the xml_doc.getroot() as the context
+                    # sometimes None. How to tell the difference?
+                    #look_for_context = None
+                    look_for_context = xml_doc
+                else:
+                    look_for_context = context_element
+                applicable_elements = select_with_context(xml_doc, look_for_context, match, namespaces=self.xslt.getroot().nsmap, variables=self.variables)
+            myprint("[XX] elements:" + str(applicable_elements))
+            if selected_element is None:
+                if len(applicable_elements) > 0:
+                    print("[XX] template is applicable (no selected element)")
+                    result.append(template)
+            elif selected_element in applicable_elements:
+                print("[XX] template is applicable (selected element in match results)")
                 result.append(template)
         # TODO: sort
         result = sorted(result, key=elem_priority, reverse=True)
@@ -189,15 +236,19 @@ class XLSTTransform:
             elements_from_select = [context_node]
         elif select is '/':
             #elements_from_select = [xml_doc.getroot()]
-            elements_from_select = [ xml_doc ]
+            elements_from_select = [ xml_doc, xml_doc.getroot() ]
         else:
             elements_from_select = select_with_context(xml_doc, context_node, select, namespaces=self.xslt.getroot().nsmap, variables=self.variables)
         print("[XX] ELEMENTS FROM SELECT: " + str(elements_from_select))
+        result = []
         for element_from_select in elements_from_select:
-            potential_templates = self.get_potential_templates(mode, xml_doc, element_from_select)
+            print("[XX] LOOKING FOR TEMPLATE FOR SELECTED ELEMENT %s" % element_from_select)
+            # Get potential templates;
+            # there are two
+            potential_templates = self.get_potential_templates2(mode, xml_doc, context_node, element_from_select)
             if len(potential_templates) == 0:
                 myprint("[XX] no potential templates")
-                return None
+                pass
             else:
                 # for template in potential_templates:
                 #    myprint("[XX] potential template: mode %s match %s priority %s" % (template.attrib['mode'], template.attrib['match'], str(template.attrib.get('priority'))))
@@ -206,7 +257,12 @@ class XLSTTransform:
                     str(element_from_select),
                     str(new_template.attrib.get('mode')), new_template.attrib['match'], str(new_template.attrib.get('priority'))))
                 # pick the first one and process
-                return self.process_template(xml_doc, new_template, element_from_select)
+                template_result = self.process_template(xml_doc, new_template, element_from_select)
+                if isinstance(template_result, list):
+                    result.extend(template_result)
+                else:
+                    result.append(template_result)
+        return result
 
     def process_node(self, node, xml_doc, context_node):
         if isinstance(node, etree._Comment):
@@ -289,6 +345,7 @@ class XLSTTransform:
     def process_xsl_choose(self, node, xml_doc, context_node):
         when_node = node.find('{http://www.w3.org/1999/XSL/Transform}when')
         otherwise_node = node.find('{http://www.w3.org/1999/XSL/Transform}otherwise')
+        print("[XX] when test: %s" % when_node.attrib['test'])
         if when_node is None:
             raise Exception('when not found')
         result = parse_expression(xml_doc, when_node.attrib['test'], when_node.nsmap, self.variables, context_item=context_node)
@@ -315,6 +372,13 @@ class XLSTTransform:
 
     def process_template(self, xml_doc, template, context_node):
         print("[XX] PROCESS TEMPLATE MODE %s" % (template.attrib.get('mode')))
+        if context_node == xml_doc:
+            if template.attrib['match'] != '/':
+                print("[XX] context is document itself, and template does not apply to '/', changing to root element")
+                context_node = xml_doc.getroot()
+            else:
+                print("[XX] context is document itself, and template applies to '/', changing to None")
+                context_node = None
         # copy all children, then process them
         #for child in template:
         #    output_node.append(copy.copy(source_child))
