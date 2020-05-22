@@ -266,8 +266,6 @@ class XLSTTransform:
 
         mode_templates = self.mode_templates[mode]
         print("[XX] Potential templates:")
-        templates_to_apply = []
-
         element_templates_todo = OrderedDict()
         for t in mode_templates:
             print("[XX]    mode: %s match: %s" % (mode, str(t.attrib.get('match'))))
@@ -276,20 +274,66 @@ class XLSTTransform:
             else:
                 look_for_context = context_node
             template_match_elements = select_with_context(xml_doc, look_for_context, t.attrib['match'], namespaces=self.xslt.getroot().nsmap, variables=self.variables)
+            if len(template_match_elements) == 0:
+                print("[XX]    no elements match template (%s), try from root element" % t.attrib['match'])
+                # If the context is None, try again from the root element
+                #if look_for_context is None:
+                #    look_for_context = xml_doc.getroot()
+                #    template_match_elements = select_with_context(xml_doc, look_for_context, t.attrib['match'], namespaces=self.xslt.getroot().nsmap, variables=self.variables)
+
+            found_applicable_element = False
             for tme in template_match_elements:
                 print("[XX]    template match element: " + str(tme))
-                if tme in elements_to_apply_on or elements_to_apply_on == [xml_doc]:
+                print("[XX]    elements_to_apply_on: " + str(elements_to_apply_on))
+                # can apply to either the element from select or their direct children
+                # and if applicable for entire doc, returns them all
+                #if tme in elements_to_apply_on or elements_to_apply_on == [xml_doc]:
+                if elements_to_apply_on == [xml_doc]:
                     print("[XX] THIS TEMPLATE IS APPLICABLE FOR %s" % str(tme))
+                    found_applicable_element = True
                     if tme in element_templates_todo:
                         element_templates_todo[tme].append(t)
                     else:
                         element_templates_todo[tme] = [t]
+                    print("[XX]     list of potentials for %s now: %s" % (str(tme), str(element_templates_todo[tme])))
+                elif tme in elements_to_apply_on:
+                    print("[XX] THIS TEMPLATE IS APPLICABLE FOR %s" % str(tme))
+                    found_applicable_element = True
+                    if tme in element_templates_todo:
+                        element_templates_todo[tme].append(t)
+                    else:
+                        element_templates_todo[tme] = [t]
+                    print("[XX]     list of potentials for %s now: %s" % (str(tme), str(element_templates_todo[tme])))
+                else:
+                    # check children too
+                    for etoa in elements_to_apply_on:
+                        if isinstance(etoa, list):
+                            if tme in etoa:
+                                found_applicable_element = True
+                                if tme in element_templates_todo:
+                                    element_templates_todo[tme].append(t)
+                                else:
+                                    element_templates_todo[tme] = [t]
+                                print("[XX]     list of potentials for %s now: %s" % (str(tme), str(element_templates_todo[tme])))
+            if not found_applicable_element:
+                print("[XX]    Did not find any applicable element, do not execute this template")
+                #if elements_to_apply_on != [xml_doc]:
+                    #for tme in template_match_elements:
+                    #    print("[XX] YYYZZYY tme in []: %s" % str(tme in [el.getchildren() for el in elements_to_apply_on]))
+                    #for el in elements_to_apply_on:
+                    #    for c in el:
+                    #        print("[XX] [YYYYYY] el: %s elchild: %s" % (str(el), str(c)))
         print("[XX] ALL TEMPLATES TO RUN:")
+        for element,templates in element_templates_todo.items():
+            print("[XX]    Element: " + str(element))
+            for template in templates:
+                print("[XX]        mode %s match %s prio %s" % (mode, str(template.attrib.get('match')), str(template.attrib.get('priority'))))
         print(element_templates_todo)
         result = []
         for element,templates in element_templates_todo.items():
             sorted_templates = sorted(templates, key=elem_priority, reverse=True)
-            template_result = self.process_template(xml_doc, templates[0], element)
+            print("[XX] CHOSE TEMPLATE %s with PRIO %s" % (str(sorted_templates[0]), str(sorted_templates[0].attrib.get('priority'))))
+            template_result = self.process_template(xml_doc, sorted_templates[0], element)
             if isinstance(template_result, list):
                 result.extend(template_result)
             else:
