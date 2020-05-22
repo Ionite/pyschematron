@@ -432,12 +432,16 @@ class XLSTTransform:
         print("[XX] when test: %s" % when_node.attrib['test'])
         if when_node is None:
             raise Exception('when not found')
+        if context_node == xml_doc:
+            # maybe None?
+            context_node = None
         result = parse_expression(xml_doc, when_node.attrib['test'], when_node.nsmap, self.variables, context_item=context_node)
         if result:
             print("[XX] result positive, apply when children")
             return self.process_node_children(when_node, xml_doc, context_node)
         elif otherwise_node is not None:
-            print("[XX] result negative, apply otherwise children")
+            print("[XX] result negative, apply otherwise children: ")
+            print(etree.tostring(otherwise_node, pretty_print=True).decode('utf-8'))
             return self.process_node_children(otherwise_node, xml_doc, context_node)
 
     def process_xsl_if(self, node, xml_doc, context_node):
