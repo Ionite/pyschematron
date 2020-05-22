@@ -26,7 +26,8 @@ def select(self, context=None):
     if context.current_item is not None:
         return [context.current_item]
     else:
-        raise Exception("current() called in a context without an original context item")
+        return [context.root.getroot()]
+        #raise Exception("current() called in a context without an original context item")
 
 
 XSLT1Parser.build()

@@ -16,9 +16,9 @@ from pyschematron.elementpath_extensions.context import XPathContextXSLT
 
 from elementpath.exceptions import ElementPathSyntaxError
 
-def elem_priority(elem):
-    if 'priority' in elem.attrib:
-        return int(elem.attrib.get('priority'))
+def elem_priority(elem_tuple):
+    if 'priority' in elem_tuple[0].attrib:
+        return int(elem_tuple[0].attrib.get('priority'))
     else:
         return 0
 
@@ -114,6 +114,7 @@ class XLSTTransform:
                     look_for_context = xml_doc
                 else:
                     look_for_context = context_element
+                #applicable_elements = select_with_context(xml_doc, look_for_context, match, namespaces=self.xslt.getroot().nsmap, variables=self.variables)
                 applicable_elements = select_with_context(xml_doc, look_for_context, match, namespaces=self.xslt.getroot().nsmap, variables=self.variables)
             myprint("[XX] elements:" + str(applicable_elements))
             if len(applicable_elements) > 0:
@@ -156,15 +157,31 @@ class XLSTTransform:
                     look_for_context = xml_doc
                 else:
                     look_for_context = context_element
-                applicable_elements = select_with_context(xml_doc, look_for_context, match, namespaces=self.xslt.getroot().nsmap, variables=self.variables)
+                if selected_element is None:
+                    applicable_elements = select_all_with_context(xml_doc, look_for_context, match, namespaces=self.xslt.getroot().nsmap, variables=self.variables)
+                else:
+                    applicable_elements = select_with_context(xml_doc, look_for_context, match, namespaces=self.xslt.getroot().nsmap, variables=self.variables)
             myprint("[XX] elements:" + str(applicable_elements))
             if selected_element is None:
                 if len(applicable_elements) > 0:
                     print("[XX] template is applicable (no selected element)")
-                    result.append(template)
+                    result.append((template, applicable_elements))
             elif selected_element in applicable_elements:
                 print("[XX] template is applicable (selected element in match results)")
-                result.append(template)
+                result.append((template, [selected_element]))
+            else:
+                # Also look for the selected element's direct children
+                #found_child = False
+                #if selected_element != xml_doc:
+                #    children = selected_element.getchildren()
+                #    for selected_child in children:
+                #        if selected_child in applicable_elements:
+                #            result.append(template)
+                #            found_child = True
+                #            break
+                #if not found_child:
+                #    print("[XX] selected element not found in match results")
+                print("[XX] selected element not found in match results")
         # TODO: sort
         result = sorted(result, key=elem_priority, reverse=True)
         return result
@@ -236,7 +253,8 @@ class XLSTTransform:
             elements_from_select = [context_node]
         elif select is '/':
             #elements_from_select = [xml_doc.getroot()]
-            elements_from_select = [ xml_doc, xml_doc.getroot() ]
+            #elements_from_select = [ xml_doc, xml_doc.getroot() ]
+            elements_from_select = [ None ]
         else:
             elements_from_select = select_with_context(xml_doc, context_node, select, namespaces=self.xslt.getroot().nsmap, variables=self.variables)
         print("[XX] ELEMENTS FROM SELECT: " + str(elements_from_select))
@@ -252,16 +270,32 @@ class XLSTTransform:
             else:
                 # for template in potential_templates:
                 #    myprint("[XX] potential template: mode %s match %s priority %s" % (template.attrib['mode'], template.attrib['match'], str(template.attrib.get('priority'))))
-                new_template = potential_templates[0]
-                myprint("[XX] applying template: context node %s mode %s match %s priority %s" % (
-                    str(element_from_select),
-                    str(new_template.attrib.get('mode')), new_template.attrib['match'], str(new_template.attrib.get('priority'))))
-                # pick the first one and process
-                template_result = self.process_template(xml_doc, new_template, element_from_select)
-                if isinstance(template_result, list):
-                    result.extend(template_result)
+                if elements_from_select != [None]:
+                    new_template = potential_templates[0][0]
+                    myprint("[XX] applying template: context node %s mode %s select %s match %s priority %s" % (
+                        str(element_from_select),
+                        str(new_template.attrib.get('mode')), select, new_template.attrib['match'], str(new_template.attrib.get('priority'))))
+                    # pick the first one and process
+                    # If the current context is still 'none', move to root now
+                    template_result = self.process_template(xml_doc, new_template, element_from_select)
+                    if isinstance(template_result, list):
+                        result.extend(template_result)
+                    else:
+                        result.append(template_result)
                 else:
-                    result.append(template_result)
+                    new_template = potential_templates[0][0]
+                    for matching_element in potential_templates[0][1]:
+                        # execute template on all matching elements
+                        myprint("[XX] applying template: context node %s mode %s match_from_template %s match %s priority %s" % (
+                            str(matching_element),
+                            str(new_template.attrib.get('mode')), select, new_template.attrib['match'], str(new_template.attrib.get('priority'))))
+                        # pick the first one and process
+                        # If the current context is still 'none', move to root now
+                        template_result = self.process_template(xml_doc, new_template, matching_element)
+                        if isinstance(template_result, list):
+                            result.extend(template_result)
+                        else:
+                            result.append(template_result)
         return result
 
     def process_node(self, node, xml_doc, context_node):
@@ -359,7 +393,7 @@ class XLSTTransform:
     def process_xsl_if(self, node, xml_doc, context_node):
         result = parse_expression(xml_doc, node.attrib['test'], node.nsmap, self.variables, context_item=context_node)
         if result is not None and result:
-            return self.process_node(node, xml_doc, context_node)
+            return self.process_node_children(node, xml_doc, context_node)
 
     def process_xsl_value_of(self, node, xml_doc, context_node):
         select = node.attrib['select']
@@ -371,8 +405,8 @@ class XLSTTransform:
         return result
 
     def process_template(self, xml_doc, template, context_node):
-        print("[XX] PROCESS TEMPLATE MODE %s" % (template.attrib.get('mode')))
-        if context_node == xml_doc:
+        print("[XX] PROCESS TEMPLATE MODE %s MATCH %s" % (template.attrib.get('mode'), str(template.attrib.get('match'))))
+        if context_node == xml_doc or context_node is None:
             if template.attrib['match'] != '/':
                 print("[XX] context is document itself, and template does not apply to '/', changing to root element")
                 context_node = xml_doc.getroot()
@@ -389,69 +423,7 @@ class PlaygroundTest(unittest.TestCase):
     """Assorted tests, mainly used as a playground for later development"""
 
     def do_run_xslt_test(self, xslt_file, xml_file):
-
-        xslt = etree.parse(xslt_file)
-        xml_doc = etree.parse(xml_file)
-
-        # Variables as defined in the XSL
-        variables = {}
-        # Template elements, and the document elements that match the match expression
-        # key: template, value: [node]
-        template_node_links = {}
-        # key: mode, value: [template]
-        mode_templates = {}
-
-        # Preprocessing
-        # Loop through the xslt, and store variables,
-        # match templates to elements
-        for element in xslt.getroot():
-            if isinstance(element, etree._Comment):
-                continue
-            el_name = etree.QName(element.tag).localname
-            if el_name == 'variable':
-                var_name = element.attrib['name']
-                var_value = element.attrib.get('select')
-                if var_value is None:
-                    var_value = element.text
-                variables[var_name] = var_value
-            elif el_name == 'template':
-                mode = element.attrib.get('mode')
-                if mode in mode_templates:
-                    mode_templates[mode].append(element)
-                else:
-                    mode_templates[mode] = [element]
-                #myprint("[XX] template match: '%s' mode %s" % (element.attrib['match'], str(element.attrib.get('mode'))))
-
-                match_expr = element.attrib['match']
-                template_match_elements = select_all_with_context(xml_doc, None, match_expr, namespaces=xslt.getroot().nsmap, variables=variables)
-                template_node_links[element] = template_match_elements
-                #myprint("[XX] matching elements (%d): %s" % (len(template_match_elements), str(template_match_elements)))
-
-        context_node = xml_doc.getroot()
-        potential_templates = get_potential_templates(mode_templates, template_node_links, None, xml_doc)
-        myprint("[XX] initial potential templates:")
-        myprint(potential_templates)
-        template = potential_templates[0]
-        for child in template.iter():
-            el_name = etree.QName(child.tag).localname
-            if el_name == 'apply-templates' and 'select' in child.attrib and 'mode' in child.attrib:
-                mode = child.attrib['mode']
-                select = child.attrib['select']
-                myprint("[XX] mode: " + mode)
-                myprint("[XX] select: " + mode)
-
-                elements_from_select = select_with_context(xml_doc, context_node, select, namespaces=xslt.getroot().nsmap, variables=variables)
-                myprint("[XX] elements for new context: " + str(elements_from_select))
-                for element_from_select in elements_from_select:
-                    if isinstance(element_from_select, etree._ElementTree):
-                        element_from_select = element_from_select.getroot()
-                    myprint("ELEMENT: " + str(element_from_select))
-                    potential_templates = []
-                    for potential_template in mode_templates[mode]:
-                        myprint("[XX] initial potential new template for mode %s: %s" % (mode, str(potential_template.attrib["match"])))
-                        matching_elements = select_with_context(xml_doc, element_from_select, potential_template.attrib['match'], namespaces=xslt.getroot().nsmap, variables=variables)
-                        myprint("[XX] matching elements: " + str(matching_elements))
-        #if context_node in template_match_elements[]
+        pass
 
     def do_run_xslt_test2(self, xslt_file, xml_file):
 
@@ -480,3 +452,6 @@ class PlaygroundTest(unittest.TestCase):
     def test_siubl20(self):
         self.do_run_xslt_test2("/home/jelte/repos/SI/validation/xsl/si-ubl-2.0.xsl",
                                "/home/jelte/repos/SI/testset/SI-UBL-2.0/SI-UBL-2.0_BR-NL-1_error_wrong_scheme.xml")
+
+if __name__ == '__main__':
+    unittest.main()
