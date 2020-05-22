@@ -237,6 +237,7 @@ class XLSTTransform:
         parser = etree.XMLParser(remove_blank_text=True)
         new = etree.fromstring(str, parser=parser)
         print(etree.tostring(new, pretty_print=True).decode('utf-8'))
+        return etree.ElementTree(new)
 
 
     def process_template_child(self, output_node, xml_doc, context_node, child):
@@ -307,7 +308,7 @@ class XLSTTransform:
                 else:
                     # check children too
                     for etoa in elements_to_apply_on:
-                        if isinstance(etoa, list):
+                        if not isinstance(etoa, str):
                             if tme in etoa:
                                 found_applicable_element = True
                                 if tme in element_templates_todo:
@@ -533,27 +534,37 @@ class PlaygroundTest(unittest.TestCase):
         xml_doc = etree.parse(xml_file)
 
         transformer = XLSTTransform(xslt)
-        transformer.transform(xml_doc)
+        return transformer.transform(xml_doc)
 
     def test_playground(self):
-        self.do_run_xslt_test2(get_file("skeleton_output", "schematron.xsl"),
-                              get_file("schematron", "schematron.sch"))
+        result = self.do_run_xslt_test2(get_file("skeleton_output", "schematron.xsl"),
+                                        get_file("schematron", "schematron.sch"))
+        failed_asserts = result.findall("//{http://purl.oclc.org/dsdl/svrl}failed-assert")
+        self.assertEqual(0, len(failed_asserts))
 
     def test_playground2(self):
-        self.do_run_xslt_test2(get_file("skeleton_output", "schematron.xsl"),
-                              get_file("schematron", "malformed/bad_is_a_attribute.sch"))
+        result = self.do_run_xslt_test2(get_file("skeleton_output", "schematron.xsl"),
+                                        get_file("schematron", "malformed/bad_is_a_attribute.sch"))
+        failed_asserts = result.findall("//{http://purl.oclc.org/dsdl/svrl}failed-assert")
+        self.assertEqual(1, len(failed_asserts))
 
     def test_siubl11_ok(self):
-        self.do_run_xslt_test2("/home/jelte/repos/SI/validation/xsl/si-ubl-1.1.xsl",
-                               "/home/jelte/repos/SI/testset/SI-UBL-1.1/SI-UBL-1.1-ok-minimal.xml")
+        result = self.do_run_xslt_test2("/home/jelte/repos/SI/validation/xsl/si-ubl-1.1.xsl",
+                                        "/home/jelte/repos/SI/testset/SI-UBL-1.1/SI-UBL-1.1-ok-minimal.xml")
+        failed_asserts = result.findall("//{http://purl.oclc.org/dsdl/svrl}failed-assert")
+        self.assertEqual(0, len(failed_asserts))
 
     def test_siubl11(self):
-        self.do_run_xslt_test2("/home/jelte/repos/SI/validation/xsl/si-ubl-1.1.xsl",
-                               "/home/jelte/repos/SI/testset/SI-UBL-1.1/SI-UBL-1.1-error-BII2-T10-R003.xml")
+        result = self.do_run_xslt_test2("/home/jelte/repos/SI/validation/xsl/si-ubl-1.1.xsl",
+                                        "/home/jelte/repos/SI/testset/SI-UBL-1.1/SI-UBL-1.1-error-BII2-T10-R003.xml")
+        failed_asserts = result.findall("//{http://purl.oclc.org/dsdl/svrl}failed-assert")
+        self.assertEqual(1, len(failed_asserts))
 
     def test_siubl20(self):
-        self.do_run_xslt_test2("/home/jelte/repos/SI/validation/xsl/si-ubl-2.0.xsl",
-                               "/home/jelte/repos/SI/testset/SI-UBL-2.0/SI-UBL-2.0_BR-NL-1_error_wrong_scheme.xml")
+        result = self.do_run_xslt_test2("/home/jelte/repos/SI/validation/xsl/si-ubl-2.0.xsl",
+                                        "/home/jelte/repos/SI/testset/SI-UBL-2.0/SI-UBL-2.0_BR-NL-1_error_wrong_scheme.xml")
+        failed_asserts = result.findall("//{http://purl.oclc.org/dsdl/svrl}failed-assert")
+        self.assertEqual(1, len(failed_asserts))
 
     def test_custom(self):
         self.do_run_xslt_test2(get_file("xslt", "student_sample.xsl"),
