@@ -40,13 +40,9 @@ def select_with_context(document, context_item, path, namespaces=None, parser=No
     """
     if not is_document_node(document):
         raise Exception("select_with_context document parameter MUST be a full ElementTree")
-    try:
-        parser = (parser or XPath2Parser)(namespaces, **kwargs)
+    parser = (parser or XPath2Parser)(namespaces, **kwargs)
 
-        root_token = parser.parse(path)
-    except ElementPathSyntaxError:
-        parser = XPath1Parser(namespaces, **kwargs)
-        root_token = parser.parse(path)
+    root_token = parser.parse(path)
     context = XPathContextXSLT(document, item=context_item)
     result = root_token.get_results(context)
     return result

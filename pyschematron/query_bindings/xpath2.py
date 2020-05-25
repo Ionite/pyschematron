@@ -7,9 +7,9 @@ import elementpath
 from . import QueryBinding
 from pyschematron.exceptions import *
 from pyschematron.elementpath_extensions.context import XPathContextXSLT
+from pyschematron.elementpath_extensions.xslt2_parser import XSLT2Parser
 
-from elementpath import XPath2Parser, XPathContext, select, Selector
-
+from elementpath import select, Selector
 
 def instantiate():
     return XPath2Binding()
@@ -30,14 +30,14 @@ class XPath2Binding(QueryBinding):
             return result
 
     def parse_expression(self, xml_document, expression, namespaces, variables, context_item=None):
-        parser = XPath2Parser(namespaces, variables)
+        parser = XSLT2Parser(namespaces, variables)
         root_node = parser.parse(expression)
         context = XPathContextXSLT(root=xml_document, item=context_item)
         result = root_node.evaluate(context)
         return result
 
     def evaluate_assertion(self, xml_document, context_element, namespaces, parser_variables, assertion):
-        parser = XPath2Parser(namespaces, parser_variables)
+        parser = XSLT2Parser(namespaces, parser_variables)
         context = XPathContextXSLT(root=xml_document, item=context_element)
         expr = "fn:boolean(%s)" % assertion
         root_token = parser.parse(expr)
@@ -51,7 +51,7 @@ class XPath2Binding(QueryBinding):
         return "$"
 
     def evaluate_name_query(self, xml_document, context_element, namespaces, parser_variables, name_query):
-        parser = XPath2Parser(namespaces, parser_variables)
+        parser = XSLT2Parser(namespaces, parser_variables)
         context = XPathContextXSLT(root=xml_document, item=context_element)
         expr = "fn:node-name(%s)" % name_query
         root_token = parser.parse(expr)
@@ -59,7 +59,7 @@ class XPath2Binding(QueryBinding):
         return result
 
     def evaluate_value_of_query(self, xml_document, context_element, namespaces, parser_variables, name_query):
-        parser = XPath2Parser(namespaces, parser_variables)
+        parser = XSLT2Parser(namespaces, parser_variables)
         context = XPathContextXSLT(root=xml_document, item=context_element)
         expr = "fn:string(%s)" % name_query
         root_token = parser.parse(expr)

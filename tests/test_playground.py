@@ -53,15 +53,7 @@ def parse_expression(xml_document, expression, namespaces, variables, context_it
     if (context_item, expression) in PARSE_CACHE:
         return PARSE_CACHE[(context_item, expression)]
     parser = XSLT2Parser(namespaces, variables)
-    try:
-        root_node = parser.parse(expression)
-    except ElementPathSyntaxError as orig_error:
-        # Attempt fallback to xpath1 first, if that fails too, raise original error
-        try:
-            parser = XSLT1Parser(namespaces, variables)
-            root_node = parser.parse(expression)
-        except:
-            raise orig_error
+    root_node = parser.parse(expression)
 
     context = XPathContextXSLT(root=xml_document, item=context_item)
     result = root_node.evaluate(context)
