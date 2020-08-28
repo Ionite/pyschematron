@@ -26,7 +26,7 @@ def oselect_with_context(document_root, context_item, path, namespaces=None, par
     return results
 
 
-def select_with_context(document, context_item, path, namespaces=None, parser=None, **kwargs):
+def oldselect_with_context(document, context_item, path, namespaces=None, parser=None, **kwargs):
     """
     XPath selector function that apply a *path* expression on *root* Element.
 
@@ -45,6 +45,27 @@ def select_with_context(document, context_item, path, namespaces=None, parser=No
     root_token = parser.parse(path)
     context = XPathContextXSLT(document, item=context_item)
     result = root_token.get_results(context)
+    return result
+
+def select_with_context(document, context_item, path, namespaces=None, parser=None, **kwargs):
+    """
+    XPath selector function that apply a *path* expression on *root* Element.
+
+    :param root: An Element or ElementTree instance.
+    :param path: The XPath expression.
+    :param namespaces: A dictionary with mapping from namespace prefixes into URIs.
+    :param parser: The parser class to use, that is :class:`XPath2Parser` for default.
+    :param kwargs: Other optional parameters for the XPath parser instance.
+    :return: A list with XPath nodes or a basic type for expressions based \
+    on a function or literal.
+    """
+    if not is_document_node(document):
+        raise Exception("select_with_context document parameter MUST be a full ElementTree")
+    parser = (parser or XPath2Parser)(namespaces, **kwargs)
+
+    root_token = parser.parse(path)
+    context = XPathContextXSLT(document, item=context_item)
+    result = list(root_token.select(context))
     return result
 
 def select_all_with_context(document, context_item, path, namespaces=None, parser=None, **kwargs):

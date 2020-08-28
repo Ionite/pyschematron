@@ -33,6 +33,49 @@ SELECT_CACHE_HITS = 0
 # (how to determine?), and cache processing result of those too
 # Anything else?
 
+class Stats(object):
+    def __init__(self):
+        # key: (node, mode),
+        # value: number of times called
+        self.node_template_calls = {}
+        # key: mode
+        # value: number of times called
+        self.template_calls = {}
+        self.total = 0
+
+    def count(self, node, template_mode):
+        self.total += 1
+        key = (node, template_mode)
+        if key in self.node_template_calls:
+            self.node_template_calls[key] += 1
+        else:
+            self.node_template_calls[key] = 1
+
+        if template_mode in self.template_calls:
+            self.template_calls[template_mode] += 1
+        else:
+            self.template_calls[template_mode] = 1
+
+    def print_stats(self):
+        print("[XX] Template applied per node:")
+        total = 0
+        sorted_node_templates = {k: v for k, v in sorted(self.node_template_calls.items(), key=lambda item: item[1])}
+        for key,val in sorted_node_templates.items():
+            total += val
+            print("%d    Node: %s Mode: %s" % (val, key[0], key[1]))
+        print("")
+
+        print("[XX] Templates applied: ")
+        sorted_templates = {k: v for k, v in sorted(self.template_calls.items(), key=lambda item: item[1])}
+        for key,val in sorted_templates.items():
+            total += val
+            print("%d    Mode: %s" % (val, key))
+        print("")
+
+
+        print("[XX] Total templates applied: %d" % self.total)
+
+
 def do_select(xml_doc, look_for_context, match, namespaces, variables):
     global SELECT_COUNTER
     global SELECT_CACHE_HITS
@@ -68,6 +111,7 @@ class Attribute:
 
 class XLSTTransform:
     def __init__(self, xslt):
+        self.stats = Stats()
         self.xslt = xslt
         self.variables = {
             'archiveDirParameter': '',
@@ -257,6 +301,7 @@ class XLSTTransform:
         parser = etree.XMLParser(remove_blank_text=True)
         new = etree.fromstring(str, parser=parser)
         print_debug(etree.tostring(new, pretty_print=True).decode('utf-8'))
+        self.stats.print_stats()
         return etree.ElementTree(new)
 
 
@@ -539,6 +584,7 @@ class XLSTTransform:
 
     def process_template(self, xml_doc, template, context_node):
         print_debug("[XX] PROCESS TEMPLATE MODE %s MATCH %s" % (template.attrib.get('mode'), str(template.attrib.get('match'))))
+        self.stats.count(context_node, template.attrib.get('mode'))
         return self.process_node_children(template, xml_doc, context_node)
 
 
