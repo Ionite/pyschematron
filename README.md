@@ -1,3 +1,5 @@
+This repository has been moved to Codeberg: https://codeberg.org/Ionite/pyschematron
+
 # pyschematron
 
 This is a library and toolset for [ISO Schematron](https://http://schematron.com/)
